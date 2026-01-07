@@ -14,7 +14,7 @@
     /* --- H1 设置 (主要标题，如 News, Data Access) --- */
     h1 {
         color: var(--b900);     /* 颜色：目前是深蓝 (#375695) */
-        font-size: 1.9rem;      /* 大小：数字越大字越大 (默认大概是2rem) */
+        font-size: 1.7rem;      /* 大小：数字越大字越大 (默认大概是2rem) */
         font-weight: 800;       /* 粗细：400是正常，700是加粗，900是特粗 */
         margin: 0 0 1rem;       /* 间距：下方留出更多空白 */
         line-height: 1.2;       /* 行高：稍微紧凑一点，防止标题太散 */
@@ -23,11 +23,11 @@
     /* --- H2 设置 (次级标题，如果以后用到) --- */
     h2 {
         color: var(--b700);     /* 颜色：我换成了稍浅一点的蓝色，区分层次 */
-        font-size: 1.8rem;      /* 大小：比 h1 小 */
+        font-size: 1.55rem;      /* 大小：比 h1 小 */
         font-weight: 600;       /* 粗细：半粗 */
         margin: 0 0 0.75rem;    /* 间距 */
     }
-    h3{color:var(--b800);margin:0 0 .5rem}
+    h3{color:var(--b800);font-size: 1.25rem; margin:0 0 .5rem}
 
     .layout{display:grid;grid-template-columns:var(--navw) 1fr;min-height:100vh;width:100%;max-width:var(--content-max);background:#fff}
     nav.sidenav{position:sticky;top:0;height:100vh;width:var(--navw);border-right:3px solid var(--b100);background:#fff;overflow:auto;z-index:1000;transition:transform .25s ease}
@@ -187,6 +187,10 @@
     html{ scroll-behavior:smooth; scroll-padding-top: var(--top-offset); }
     .panel{ scroll-margin-top: var(--top-offset); }
 
+    .sidenav a.no-hover:hover {
+      background: transparent !important;
+    }
+
   </style>
 </head>
 
@@ -205,6 +209,13 @@
         <li><a href="#development" data-section="development"><span class="dot" aria-hidden="true"></span><span class="label">Development Story</span></a></li>
         <li><a href="#tool" data-section="tool"><span class="dot" aria-hidden="true"></span><span class="label">Useful Tools</span></a></li>
       </ul>
+        <div style="margin-top: 2rem; padding: 1rem 1rem; border-top: 2px solid #e8efff; font-size: 0.85rem; color: #1d3c7a;">
+          <p style="margin-bottom: 0.1rem; font-weight: 600; color: #1d2c7a; font-size: 0.95rem;">Contact</p>
+          <div style="line-height: 2;">
+            <a href="https://duochanatharvard.github.io/" target="_blank" class="no-hover" style="text-decoration: none; color: #5474b8; display: block; font-weight:400">🌐 Duo CHAN </a>
+            <a href="mailto:Duo.Chan@soton.ac.uk" class="no-hover" style="text-decoration: none; color: #5474b8; font-size: 0.8rem; font-weight:300">📧 Duo.Chan@soton.ac.uk</a>
+          </div>
+        </div>
     </nav>
 
     <!--**********************************************************************************************************************--->
@@ -221,6 +232,15 @@
             a 200-member ensemble of 5°x5° monthly Earth surface temperature estimates since 1850.  
             Its infilled version, <b>DCENT-I</b>, extends coverage to the global domain using 
             Gaussian process regression with anisotropic kernels to enhance spatial pattern fidelity. 
+
+          </p>
+
+          <p class="intro">
+            The development of these products spans a decade of research conducted at 
+            <b style="color: #738ec9; font-weight:550">Harvard University</b>, 
+            <b style="color: #738ec9; font-weight:550">Woods Hole Oceanographic Institution</b>, and the
+            <b style="color: #738ec9; font-weight:550">University of Southampton</b>, 
+            in collaboration with the UK <b style="color: #738ec9; font-weight:550">National Oceanography Centre</b>.
             Together, they support quantification of historical climate change at 
             global and regional scales and analysis of associated variability and dynamics.
           </p>
@@ -326,7 +346,7 @@
 
           <h1>Development Story</h1>
           
-          <p><h3>Background and Unsolved Problems</h3></p>
+          <p><h3>🚨 Background and Unsolved Problems</h3></p>
           <p>
             By 2023, "most state-of-the-art" global mean surface temperature 
             (<B style="font-weight: 550;">GMST</B>)
@@ -385,7 +405,7 @@
         
           <!----------------------------------------------------------------->
           <hr> 
-          <p><h3>Our Vision and Approach</h3></p>
+          <p><h3>🎯 Our Vision and Approach</h3></p>
 
           <p>
             <b style="font-weight: 600; color:#cf6621">
@@ -450,7 +470,7 @@
           <!----------------------------------------------------------------->
           <hr/>
 
-          <p><h3>Our Key Achievements</h3></p>
+          <p><h3>🏆 Our Key Achievements</h3></p>
 
           <p>
             These improvements enable an ensemble of temperature estimates with 
@@ -505,7 +525,7 @@
       <!--**********************************************************************************************************************--->
       <section id="tool" class="panel">
         <div class="container">
-          <h1>Useful Tools</h1>
+          <h1>🛠️ Useful Tools</h1>
           <iframe src="Dataset_selector.html" style="width:130%; height:1000px; border:0; display:block;"> </iframe>
          </div>
       </section>
