@@ -1,16 +1,23 @@
 // main.js
 
+// === 0. 全局配置 (Global Configuration) ===
+// 在这里统一管理所有需要折叠的 Section ID 和对应的按钮文字
+const TOGGLE_CONFIG = {
+    'publications': { expand: 'Full Publication List', collapse: 'Highlighted Publications' },
+    'dcentstory':   { expand: 'Read The Full Story',   collapse: 'Read Less' },
+    'past':         { expand: 'Read More',             collapse: 'Read Less' }
+    // 如果未来 outreach 也需要折叠，只需在这里加一行即可：
+    // 'outreach': { expand: 'Show Outreach', collapse: 'Hide Outreach' }
+};
+
 // === 1. 文献渲染工具函数 ===
-// 负责将 references.js 中的内容填入 HTML
 function renderReferences(scope = document) {
-    // 检查 references.js 是否已加载
     if (typeof refs === 'undefined') {
         console.warn("references.js is not loaded yet.");
         return;
     }
     scope.querySelectorAll("[data-ref]").forEach(el => {
         const key = el.getAttribute("data-ref");
-        // 只有当标签内容为空且 refs 中有数据时才填充，避免重复
         if (refs[key] && el.innerHTML.trim() === "") {
             el.innerHTML = refs[key];
         }
@@ -23,7 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // 2.1 先尝试渲染主页面上原本就有的文献引用
     renderReferences();
 
-    // 2.2 处理 include-html
+    // 2.2 处理动态引入 (include-html)
     const elements = document.querySelectorAll('[include-html]');
 
     elements.forEach(el => {
@@ -40,12 +47,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 el.innerHTML = text;
                 el.removeAttribute('include-html'); 
                 
-                // 【修复核心】：内容加载完毕后，手动触发一次文献渲染
+                // A. 重新渲染引用
                 renderReferences(el); 
 
-                // 如果被加载的内容里包含折叠面板(toggle)，可能需要在这里重新绑定事件
-                // 为了兼容你原有的逻辑，这里暂时不做额外处理，
-                // 但如果发现折叠面板失效，需要把 setupToggle 的调用移到这里。
+                // B. 【全局修复】尝试初始化折叠功能
+                // 检查被加载内容的父级 ID 是否在配置表中
+                if (el.parentElement && TOGGLE_CONFIG[el.parentElement.id]) {
+                    setupToggle(el.parentElement, TOGGLE_CONFIG[el.parentElement.id]);
+                }
             })
             .catch(err => {
                 el.innerHTML = "Could not load file: " + file;
@@ -53,16 +62,25 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
     });
+
+    // 2.3 【全局修复】处理页面上已有的静态内容 (非 include 加载的部分)
+    // 遍历配置表，如果元素存在且还没初始化，就进行初始化
+    Object.keys(TOGGLE_CONFIG).forEach(id => {
+        const section = document.getElementById(id);
+        if (section) {
+            setupToggle(section, TOGGLE_CONFIG[id]);
+        }
+    });
 });
 
 // === 3. 辅助函数 (Offset & Scroll) ===
 function getTopOffset(){
-    return window.innerWidth <= 640 ? 70 : 0;  // small vs large screens
+    return window.innerWidth <= 640 ? 70 : 0; 
 }
 
 function smoothScrollTo(sel){
     const el = document.querySelector(sel); if(!el) return;
-    openParentDetails(el);                         // ensure section is expanded
+    openParentDetails(el);                         
     const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const y = el.getBoundingClientRect().top + window.pageYOffset - getTopOffset();
     window.scrollTo({ top: y, behavior: reduce ? 'auto' : 'smooth' });
@@ -83,7 +101,6 @@ for (var i = 0; i < links.length; i++){
         e.preventDefault();
         var target = this.getAttribute('href');
         smoothScrollTo(target);
-        // highlight now
         var id = target && target.charAt(0)==='#' ? target.slice(1) : null;
         if (id) setActive(id);
         if (window.innerWidth <= 640){ 
@@ -95,8 +112,6 @@ for (var i = 0; i < links.length; i++){
 
 // === 5. Scroll Spy (滚动监听) ===
 var sections = document.querySelectorAll('section.panel');
-
-// Maps: section id -> link, and data-section -> link
 var byId = {}, bySection = {};
 for(var i = 0; i < links.length; i++){
     var l = links[i];
@@ -106,13 +121,10 @@ for(var i = 0; i < links.length; i++){
 }
 
 var currentId = null;
-
 function setActive(id){
     if(id === currentId) return;
     currentId = id;
-    // clear
     for (var m = 0; m < links.length; m++) links[m].removeAttribute('aria-current');
-    // set current
     var link = byId[id];
     if (!link) return;
     link.setAttribute('aria-current','true');
@@ -144,14 +156,6 @@ window.addEventListener('resize', onScroll);
 window.addEventListener('load', updateActive);
 
 // === 6. Hash 处理 & Details 展开 ===
-window.addEventListener('hashchange', function(){
-    if (!location.hash) return;
-    const el = document.getElementById(location.hash.slice(1));
-    if (el){ openParentDetails(el); smoothScrollTo('#' + el.id); }
-});
-// Initial load update
-updateActive();
-
 function openParentDetails(el){
     for (var p = el && el.parentElement; p; p = p.parentElement){
         if (p.tagName === 'DETAILS') p.open = true;
@@ -162,17 +166,27 @@ window.addEventListener('hashchange', function(){
     var el = document.getElementById(location.hash.slice(1));
     if (el){ openParentDetails(el); el.scrollIntoView({behavior:'smooth', block:'start'}); }
 });
+updateActive();
 
 // === 7. Toggle (折叠面板逻辑) ===
-// Reusable toggler: swaps summary <p> with .detail block and updates button text + aria-expanded
 function setupToggle(section, labels){
-    if (!section) return; // Safety check
+    if (!section) return; 
+
+    // 【防重锁】检查是否已经初始化过，防止重复绑定事件
+    if (section.dataset.toggleInitialized === 'true') {
+        return; 
+    }
+
     const btn = section.querySelector('.toggle-btn');
     const summary = section.querySelector('.summary');
     const detail = section.querySelector('.detail');
+    
+    // 如果找不到必要的 DOM 元素，说明 HTML 结构还没准备好（或者结构有误），直接返回
     if(!btn || !summary || !detail) return;
 
-    // Ensure aria-controls points at the detail id
+    // 标记为已初始化
+    section.dataset.toggleInitialized = 'true';
+
     if(!detail.id){ detail.id = section.id + '-detail'; }
     btn.setAttribute('aria-controls', detail.id);
 
@@ -183,7 +197,7 @@ function setupToggle(section, labels){
         btn.textContent = expanded ? labels.collapse : labels.expand;
     }
 
-    // Initial state: collapsed (summary visible)
+    // Initial state
     setExpanded(false);
 
     btn.addEventListener('click', function(){
@@ -191,11 +205,3 @@ function setupToggle(section, labels){
         setExpanded(next);
     });
 }
-
-// Attach to demos
-// 注意：如果你这几个 ID (publications, dcentstory, past) 是在 include-html 加载的文件里，
-// 这段代码可能需要在 fetch 完成后再次运行。
-// 目前保持原样运行，如果页面里有这些 ID 就能生效。
-setupToggle(document.getElementById('publications'),  {expand:'Full Publication List',    collapse:'Highlighted Publications'});
-setupToggle(document.getElementById('dcentstory'),  {expand:'Read The Full Story',    collapse:'Read Less'});
-setupToggle(document.getElementById('past'),  {expand:'Read More',    collapse:'Read Less'});
