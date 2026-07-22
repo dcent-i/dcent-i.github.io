@@ -17,6 +17,9 @@
     --dim:0.7;
     --marker-dim:0.1;
     --legend-muted:#444;
+    --controls-rule-width:73%;
+    --axis-rule-width:73%;
+    --legend-rule-width:73%;
   }
   html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif}
@@ -146,7 +149,27 @@
     margin: 0;                    /* control spacing */
   }
 
-  .tl-scroll{ overflow-x:auto; }
+  /* Separators: adjust the three --*-rule-width values above to change length. */
+  .controls + hr {
+    width:var(--controls-rule-width);
+    margin-left:0;
+    margin-right:auto;
+  }
+  .axis + hr.dashed {
+    width:var(--axis-rule-width);
+    margin-left:0;
+    margin-right:auto;
+  }
+  .legend + hr {
+    width:var(--legend-rule-width);
+    margin-left:0;
+    margin-right:auto;
+  }
+
+  .tl-scroll{
+    overflow-x:auto;
+    overflow-y:hidden;
+  }
   .tl-content{ min-width:300px; }  /* prevents shrink; enables sideways scroll */
   .grid, .legend, .axis{ min-width:300px; }  /* match the same min */
 
@@ -304,7 +327,7 @@
 
 <script type="application/json" id="data">
 [
-  {"id":"dcssti","name":"DCSST-I","pub_year":2026,
+  {"id":"dcssti","name":"DCENT-I SST","pub_year":2026,
    "icons":{"ship":true,"buoy":true,"sat":false},
    "temporal":"Monthly","spatial":"5°","spatial_complete":true,"ensemble":200,
    "start":1850,"end":"present","bg_start":1850,"bg_end":"present",
@@ -314,7 +337,7 @@
    "guide_url":"https://climatedataguide.ucar.edu/climate-data/dcent",
    "download_url":"https://doi.org/10.7910/DVN/ROG38Q"},
 
-  {"id":"dcsst","name":"DCSST","pub_year":2024,
+  {"id":"dcsst","name":"DCENT SST","pub_year":2024,
    "icons":{"ship":true,"buoy":true,"sat":false},
    "temporal":"Monthly","spatial":"5°","spatial_complete":false,"ensemble":200,
    "start":1850,"end":"present","bg_start":1850,"bg_end":"present",
@@ -368,7 +391,7 @@
    "download_url":"https://www.metoffice.gov.uk/hadobs/hadsst2/data/download.html",
    "markers":[{"year":1910,"code":"C"},{"year":1930,"code":"I"},{"year":1942,"code":"W"}]},
 
-  {"id":"ersst6","name":"ERSST6","pub_year":2025,
+  {"id":"ersst6","name":"ERSSTv6","pub_year":2025,
    "icons":{"ship":true,"buoy":true,"sat":false},
    "temporal":"Monthly","spatial":"2°","spatial_complete":true,"ensemble":"1",
    "start":1850,"end":"present","bg_start":1850,"bg_end":"present",
@@ -379,7 +402,7 @@
    "download_url":"https://www.ncei.noaa.gov/data/sea-surface-temperature-extended-reconstructed/v6/access/",
    "markers":[{"year":1910,"code":"C"},{"year":1930,"code":"I"},{"year":1942,"code":"W"}]},
 
-  {"id":"ersst5","name":"ERSST5","pub_year":2017,
+  {"id":"ersst5","name":"ERSSTv5","pub_year":2017,
    "icons":{"ship":true,"buoy":true,"sat":false},
    "temporal":"Monthly","spatial":"2°","spatial_complete":true,"ensemble":1000,
    "start":1854,"end":"present","bg_start":1850,"bg_end":"present",
@@ -390,7 +413,7 @@
    "download_url":"https://www.ncei.noaa.gov/pub/data/cmb/ersst/v5/netcdf/",
    "markers":[{"year":1910,"code":"C"},{"year":1930,"code":"I"},{"year":1942,"code":"W"}]},
 
-  {"id":"ersst4","name":"ERSST4","pub_year":2015,
+  {"id":"ersst4","name":"ERSSTv4","pub_year":2015,
    "icons":{"ship":true,"buoy":true,"sat":false},
    "temporal":"Monthly","spatial":"2°","spatial_complete":true,"ensemble":1000,
    "start":1854,"end":2020,"bg_start":1850,"bg_end":"present",
@@ -401,7 +424,7 @@
    "download_url":"https://www.ncei.noaa.gov/pub/data/cmb/ersst/v4/netcdf/",
    "markers":[{"year":1910,"code":"C"},{"year":1930,"code":"I"},{"year":1942,"code":"W"}]},
 
-  {"id":"ersst3","name":"ERSST3b","pub_year":2009,
+  {"id":"ersst3","name":"ERSSTv3b","pub_year":2009,
    "icons":{"ship":true,"buoy":true,"sat":false},
    "temporal":"Monthly","spatial":"2°","spatial_complete":true,"ensemble":1,
    "start":1854,"end":2020,"bg_start":1850,"bg_end":"present",
@@ -414,7 +437,7 @@
   {"id":"cobesst3","name":"COBE-SST3","pub_year":2025,
    "icons":{"ship":true,"buoy":true,"sat":false},
    "temporal":"Daily","spatial":"0.25°","spatial_complete":true,"ensemble":300,
-   "start":1850,"end":2020,"bg_start":1850,"bg_end":"present",
+   "start":1850,"end":2024,"bg_start":1850,"bg_end":"present",
    "color":"#35971a","state_of_the_art":true,"update_frequency":"Static",
    "url":"https://metsoc.jp/jmsj/GA/JMSJ2025-002.pdf",
    "pub_url":"https://doi.org/10.2151/jmsj.2025-002",
@@ -432,7 +455,7 @@
    "download_url":"https://downloads.psl.noaa.gov/Datasets/COBE2/",
    "markers":[{"year":1910,"code":"C"},{"year":1930,"code":"I"},{"year":1942,"code":"W"}]},
 
-  {"id":"cobesst","name":"COBE-SST","pub_year":2005,
+  {"id":"cobesst","name":"COBE-SST1","pub_year":2005,
    "icons":{"ship":true,"buoy":true,"sat":false},
    "temporal":"Monthly","spatial":"1°","spatial_complete":true,"ensemble":1,
    "start":1891,"end":2023,"bg_start":1850,"bg_end":"present",
