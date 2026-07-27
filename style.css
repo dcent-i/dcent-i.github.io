@@ -91,6 +91,16 @@ b, strong {font-family: 'Calibri', sans-serif; font-weight: 600;  color: #5573b3
 .dashboard-monthly-season-grid-line{stroke:#cbd8ed;stroke-width:1.1}
 .dashboard-monthly-tick{font-size:18px}
 .dashboard-monthly-axis-label{font-size:23px}
+.dashboard-panel--stripes{display:flex;flex-direction:column}
+.dashboard-panel--stripes .dashboard-figure,.dashboard-panel--stripes .dashboard-chart-frame,.dashboard-panel--stripes .dashboard-stripe-chart{display:flex;flex:1;min-height:0}
+.dashboard-panel--stripes .dashboard-stripe-chart svg{height:100%}
+.dashboard-stripe-chart{min-height:28rem}
+.dashboard-stripe-field{fill:#f7f9fc}
+.dashboard-stripe{shape-rendering:crispEdges;transition:y .18s cubic-bezier(.2,.8,.2,1)}
+.dashboard-stripe-hit-area{fill:transparent;cursor:crosshair;pointer-events:all}
+.dashboard-stripe-credit-link{cursor:pointer}
+.dashboard-stripe-credit-text{fill:#fff;fill-opacity:.94;stroke:#111;stroke-opacity:.62;stroke-width:3.8;paint-order:stroke;stroke-linejoin:round;font-family:Calibri,Arial,sans-serif;font-size:20px;font-weight:500;letter-spacing:.01em}
+.dashboard-stripe-credit-link:hover .dashboard-stripe-credit-text{fill:#fff;fill-opacity:1;stroke-opacity:.82}
 .dashboard-grid-line{stroke:#e8efff;stroke-width:1}
 .dashboard-grid-line-minor{stroke:#edf2fc;stroke-width:.8}
 .dashboard-grid-line-major{stroke:#cddaf3;stroke-width:1.3}
@@ -150,6 +160,7 @@ b, strong {font-family: 'Calibri', sans-serif; font-weight: 600;  color: #5573b3
 .dashboard-hit-area{fill:transparent;cursor:crosshair;pointer-events:all}
 @media (prefers-reduced-motion:reduce){.dashboard-series-area,.dashboard-series-line,.dashboard-svg-legend-band,.dashboard-svg-legend-line,.dashboard-svg-legend-point,.dashboard-svg-legend-label,.dashboard-monthly-product,.dashboard-monthly-line{transition:none}}
 @media (prefers-reduced-motion:reduce){.dashboard-latest-ripple-ring{display:none}}
+@media (prefers-reduced-motion:reduce){.dashboard-stripe-wave{display:none}}
 .dashboard-carousel-navigation{display:grid;grid-template-columns:auto minmax(7rem,1fr) auto;align-items:center;gap:.85rem;width:90%;margin:1rem 0 0}
 .dashboard-carousel-arrow{appearance:none;width:2rem;height:2rem;padding:0;border:1px solid var(--b400);border-radius:50%;background:#fff;color:var(--b800);font:600 1.25rem/1 Calibri,Arial,sans-serif;cursor:pointer}
 .dashboard-carousel-arrow:hover:not(:disabled){background:var(--b100)}

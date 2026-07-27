@@ -15,6 +15,8 @@
     const BASELINE_END_YEAR = 1900;
     const ALIGNMENT_START_YEAR = 1981;
     const ALIGNMENT_END_YEAR = 2010;
+    const WARMING_STRIPES_BASELINE_START_YEAR = 1961;
+    const WARMING_STRIPES_BASELINE_END_YEAR = 2010;
     const POINT_RADIUS = 3;
     const HOVER_POINT_RADIUS = 4.2;
     const VERTICAL_HIT_TOLERANCE_PX = 19;
@@ -1092,6 +1094,118 @@
         return { selectDataset, selectedKey: () => selectedKey };
     }
 
+    function warmingStripeColor(value) {
+        const cool = [35, 91, 169];
+        const neutral = [247, 249, 252];
+        const warm = [195, 39, 63];
+        const stripeLimit = 0.8;
+        if (value <= 0) return rgbColor(blendColor(cool, neutral, Math.max(0, (value + stripeLimit) / stripeLimit)));
+        return rgbColor(blendColor(neutral, warm, Math.min(1, value / stripeLimit)));
+    }
+
+    function renderWarmingStripes(host, records) {
+        const width = 1100;
+        // This is the SVG's internal aspect ratio only. The flex layout keeps
+        // the card itself at the carousel's existing height.
+        const height = 700;
+        const margin = { top: 16, right: 34, bottom: 16, left: 34 };
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+        const firstYear = records[0].year;
+        const lastYear = records[records.length - 1].year;
+        const stripeWidth = chartWidth / records.length;
+
+        host.replaceChildren();
+        const svg = svgEl('svg', {
+            viewBox: `0 0 ${width} ${height}`,
+            role: 'img',
+            'aria-label': `DCENT-I global mean surface temperature warming stripes, ${firstYear} to ${lastYear}`
+        });
+        const defs = appendSvg(svg, 'defs');
+        const clipPath = appendSvg(defs, 'clipPath', { id: 'warming-stripes-clip' });
+        appendSvg(clipPath, 'rect', { x: margin.left, y: margin.top, width: chartWidth, height: chartHeight });
+
+        appendSvg(svg, 'rect', {
+            class: 'dashboard-stripe-field',
+            x: margin.left,
+            y: margin.top,
+            width: chartWidth,
+            height: chartHeight
+        });
+        const stripeLayer = appendSvg(svg, 'g');
+        const stripeElements = records.map((record, index) => appendSvg(stripeLayer, 'rect', {
+            class: 'dashboard-stripe',
+            x: margin.left + index * stripeWidth,
+            y: margin.top,
+            width: stripeWidth + 0.2,
+            height: chartHeight,
+            fill: warmingStripeColor(record.value)
+        }));
+        const hitArea = appendSvg(svg, 'rect', {
+            class: 'dashboard-stripe-hit-area',
+            x: margin.left,
+            y: margin.top,
+            width: chartWidth,
+            height: chartHeight
+        });
+        const creditLink = appendSvg(svg, 'a', {
+            class: 'dashboard-stripe-credit-link',
+            href: 'https://showyourstripes.info/',
+            target: '_blank',
+            rel: 'noopener noreferrer',
+            'aria-label': 'Inspired by Ed Hawkins’ Warming Stripes — opens in a new tab'
+        });
+        appendSvg(creditLink, 'text', {
+            class: 'dashboard-stripe-credit-text',
+            x: width - margin.right - 12,
+            y: height - margin.bottom - 16,
+            'text-anchor': 'end'
+        }, 'Inspired by Ed Hawkins’ Warming Stripes ↗');
+        let activeIndex = -1;
+
+        function stripeLift(distance) {
+            if (distance === 0) return 14;
+            if (distance === 1) return 8;
+            if (distance === 2) return 3;
+            return 0;
+        }
+
+        function liftStripe(stripe, index, lift) {
+            const baseX = margin.left + index * stripeWidth;
+            const baseWidth = stripeWidth + 0.2;
+            stripe.removeAttribute('transform');
+            stripe.setAttribute('x', String(baseX));
+            stripe.setAttribute('y', String(margin.top - lift));
+            stripe.setAttribute('width', String(baseWidth));
+        }
+
+        function focusStripe(index) {
+            activeIndex = index;
+            const affected = stripeElements
+                .map((stripe, stripeIndex) => ({ stripe, stripeIndex, distance: Math.abs(stripeIndex - index) }))
+                .filter(item => item.distance <= 2)
+                .sort((a, b) => b.distance - a.distance);
+
+            stripeElements.forEach((stripe, stripeIndex) => {
+                liftStripe(stripe, stripeIndex, stripeLift(Math.abs(stripeIndex - index)));
+            });
+            affected.forEach(({ stripe }) => stripeLayer.appendChild(stripe));
+        }
+
+        hitArea.addEventListener('pointermove', event => {
+            const bounds = svg.getBoundingClientRect();
+            const pointerX = (event.clientX - bounds.left) * (width / bounds.width);
+            const index = Math.max(0, Math.min(records.length - 1, Math.floor((pointerX - margin.left) / stripeWidth)));
+            if (index !== activeIndex) focusStripe(index);
+        });
+        hitArea.addEventListener('pointerleave', () => {
+            activeIndex = -1;
+            stripeElements.forEach((stripe, index) => liftStripe(stripe, index, 0));
+        });
+
+        host.appendChild(svg);
+    }
+
     function initialiseCarousel(carousel) {
         const viewport = carousel.querySelector('.dashboard-carousel-viewport');
         const slides = [...carousel.querySelectorAll('.dashboard-slide')];
@@ -1205,6 +1319,21 @@
                             <p>This panel is reserved for spatial views. No map is shown until the required data and map design are defined.</p>
                         </section>
                     </article>
+                    <article class="dashboard-slide" aria-labelledby="warming-stripes-heading">
+                        <section class="dashboard-panel dashboard-panel--stripes">
+                            <div class="dashboard-panel-heading">
+                                <div>
+                                    <h2 id="warming-stripes-heading">DCENT-I GMST Warming Stripes</h2>
+                                    <p class="dashboard-panel-subtitle" aria-hidden="true">&nbsp;</p>
+                                </div>
+                            </div>
+                            <figure class="dashboard-figure">
+                                <div class="dashboard-chart-frame">
+                                    <div class="dashboard-chart dashboard-stripe-chart" role="status"><p class="dashboard-status">Loading DCENT-I warming stripes…</p></div>
+                                </div>
+                            </figure>
+                        </section>
+                    </article>
                 </div>
                 <nav class="dashboard-carousel-navigation" aria-label="Dashboard view navigation">
                     <button class="dashboard-carousel-arrow" type="button" data-carousel-previous aria-label="Previous dashboard view">‹</button>
@@ -1213,6 +1342,7 @@
                             <button class="dashboard-carousel-dot" type="button" data-carousel-slide="0" aria-label="Show annual global mean surface temperature"></button>
                             <button class="dashboard-carousel-dot" type="button" data-carousel-slide="1" aria-label="Show monthly time series"></button>
                             <button class="dashboard-carousel-dot" type="button" data-carousel-slide="2" aria-label="Show spatial maps"></button>
+                            <button class="dashboard-carousel-dot" type="button" data-carousel-slide="3" aria-label="Show DCENT-I warming stripes"></button>
                         </div>
                     </div>
                     <button class="dashboard-carousel-arrow" type="button" data-carousel-next aria-label="Next dashboard view">›</button>
@@ -1221,6 +1351,7 @@
 
         const chartHost = content.querySelector('.dashboard-chart:not(.dashboard-monthly-chart)');
         const monthlyChartHost = content.querySelector('.dashboard-monthly-chart');
+        const stripeChartHost = content.querySelector('.dashboard-stripe-chart');
         const monthlyProductButtons = [...content.querySelectorAll('[data-monthly-product]')];
         let annualCommonOffset;
         let monthlyRawDatasets;
@@ -1294,11 +1425,22 @@
                         `<span class="dashboard-panel-rank">${ordinal(ranking.rank)}</span>`
                     );
                 });
+                const dcentIStripes = annualAlignment.series.find(item => item.key === 'dcentI');
+                stripeChartHost.removeAttribute('role');
+                renderWarmingStripes(
+                    stripeChartHost,
+                    rebaseAnomalies(
+                        dcentIStripes.records,
+                        WARMING_STRIPES_BASELINE_START_YEAR,
+                        WARMING_STRIPES_BASELINE_END_YEAR
+                    )
+                );
                 renderMonthlyWhenReady();
             })
             .catch(error => {
                 chartHost.innerHTML = `<p class="dashboard-status error">The annual GMST data could not be loaded. Please try again later.</p>`;
                 monthlyChartHost.innerHTML = `<p class="dashboard-status error">The monthly GMST data could not be aligned because the annual GMST reference could not be loaded.</p>`;
+                stripeChartHost.innerHTML = `<p class="dashboard-status error">The DCENT-I warming stripes could not be loaded because the annual GMST reference could not be loaded.</p>`;
                 console.error('Unable to load annual GMST data:', error);
             });
 
