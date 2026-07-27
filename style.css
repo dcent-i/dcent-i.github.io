@@ -49,7 +49,7 @@ b, strong {font-family: 'Calibri', sans-serif; font-weight: 600;  color: #5573b3
 .dashboard-shell{min-height:24rem}
 .dashboard-content{min-height:16rem}
 .dashboard-carousel{width:100%}
-.dashboard-carousel-viewport{display:flex;overflow-x:auto;overscroll-behavior-x:contain;padding:0 0 .5rem;scroll-behavior:smooth;scroll-snap-type:x mandatory;scrollbar-width:none}
+.dashboard-carousel-viewport{display:flex;overflow-x:auto;overscroll-behavior-x:contain;padding:0 10% .5rem 0;scroll-behavior:smooth;scroll-snap-type:x mandatory;scrollbar-width:none}
 .dashboard-carousel-viewport::-webkit-scrollbar{display:none}
 .dashboard-slide{flex:0 0 90%;min-width:0;scroll-snap-align:start;scroll-snap-stop:always}
 .dashboard-slide + .dashboard-slide{border-left:2px solid var(--b100);padding-left:1.25rem}
@@ -95,12 +95,15 @@ b, strong {font-family: 'Calibri', sans-serif; font-weight: 600;  color: #5573b3
 .dashboard-panel--stripes .dashboard-figure,.dashboard-panel--stripes .dashboard-chart-frame,.dashboard-panel--stripes .dashboard-stripe-chart{display:flex;flex:1;min-height:0}
 .dashboard-panel--stripes .dashboard-stripe-chart svg{height:100%}
 .dashboard-stripe-chart{min-height:28rem}
-.dashboard-stripe-field{fill:#f7f9fc}
-.dashboard-stripe{shape-rendering:crispEdges;transition:y .18s cubic-bezier(.2,.8,.2,1)}
+.dashboard-stripe-field{fill:#fff}
+.dashboard-stripe{shape-rendering:crispEdges}
+.dashboard-stripe-sheen-layer{pointer-events:none}
+.dashboard-stripe-sheen{pointer-events:none}
+.dashboard-stripe-shadow{fill:none;stroke:#1f3155;stroke-opacity:.32;stroke-width:9;pointer-events:none}
 .dashboard-stripe-hit-area{fill:transparent;cursor:crosshair;pointer-events:all}
 .dashboard-stripe-credit-link{cursor:pointer}
-.dashboard-stripe-credit-text{fill:#fff;fill-opacity:.94;stroke:#111;stroke-opacity:.62;stroke-width:3.8;paint-order:stroke;stroke-linejoin:round;font-family:Calibri,Arial,sans-serif;font-size:20px;font-weight:500;letter-spacing:.01em}
-.dashboard-stripe-credit-link:hover .dashboard-stripe-credit-text{fill:#fff;fill-opacity:1;stroke-opacity:.82}
+.dashboard-stripe-credit-text{fill:#7f8797;font-family:Calibri,Arial,sans-serif;font-size:1.2rem;font-style:italic;font-weight:400;letter-spacing:.01em}
+.dashboard-stripe-credit-link:hover .dashboard-stripe-credit-text{fill:#5474b8}
 .dashboard-grid-line{stroke:#e8efff;stroke-width:1}
 .dashboard-grid-line-minor{stroke:#edf2fc;stroke-width:.8}
 .dashboard-grid-line-major{stroke:#cddaf3;stroke-width:1.3}

@@ -1108,7 +1108,7 @@
         // This is the SVG's internal aspect ratio only. The flex layout keeps
         // the card itself at the carousel's existing height.
         const height = 700;
-        const margin = { top: 16, right: 34, bottom: 16, left: 34 };
+        const margin = { top: 16, right: 34, bottom: 50, left: 34 };
         const chartWidth = width - margin.left - margin.right;
         const chartHeight = height - margin.top - margin.bottom;
         const firstYear = records[0].year;
@@ -1124,6 +1124,38 @@
         const defs = appendSvg(svg, 'defs');
         const clipPath = appendSvg(defs, 'clipPath', { id: 'warming-stripes-clip' });
         appendSvg(clipPath, 'rect', { x: margin.left, y: margin.top, width: chartWidth, height: chartHeight });
+        const waveClipPath = appendSvg(defs, 'clipPath', { id: 'warming-stripes-wave-clip' });
+        const waveClipShape = appendSvg(waveClipPath, 'path', {
+            d: `M ${margin.left} ${margin.top} H ${margin.left + chartWidth} V ${margin.top + chartHeight} H ${margin.left} Z`
+        });
+        const shadowFilter = appendSvg(defs, 'filter', {
+            id: 'warming-stripes-shadow-filter',
+            x: '-10%',
+            y: '-100%',
+            width: '120%',
+            height: '300%'
+        });
+        appendSvg(shadowFilter, 'feGaussianBlur', { stdDeviation: 3 });
+        const sheenGradient = appendSvg(defs, 'linearGradient', {
+            id: 'warming-stripes-sheen',
+            x1: '0%',
+            y1: '0%',
+            x2: '100%',
+            y2: '0%'
+        });
+        [
+            ['0%', '#ffffff', 0],
+            ['27%', '#ffffff', 0],
+            ['43%', '#ffffff', 0.16],
+            ['50%', '#ffffff', 0.3],
+            ['58%', '#223c67', 0.16],
+            ['74%', '#223c67', 0],
+            ['100%', '#223c67', 0]
+        ].forEach(([offset, color, opacity]) => appendSvg(sheenGradient, 'stop', {
+            offset,
+            'stop-color': color,
+            'stop-opacity': opacity
+        }));
 
         appendSvg(svg, 'rect', {
             class: 'dashboard-stripe-field',
@@ -1141,6 +1173,25 @@
             height: chartHeight,
             fill: warmingStripeColor(record.value)
         }));
+        const sheenWidth = stripeWidth * 30;
+        const sheenLayer = appendSvg(svg, 'g', {
+            class: 'dashboard-stripe-sheen-layer',
+            'clip-path': 'url(#warming-stripes-wave-clip)'
+        });
+        const sheen = appendSvg(sheenLayer, 'rect', {
+            class: 'dashboard-stripe-sheen',
+            x: margin.left,
+            y: margin.top - 60,
+            width: sheenWidth,
+            height: chartHeight + 120,
+            fill: 'url(#warming-stripes-sheen)',
+            opacity: 0
+        });
+        const waveShadow = appendSvg(svg, 'path', {
+            class: 'dashboard-stripe-shadow',
+            filter: 'url(#warming-stripes-shadow-filter)',
+            opacity: 0
+        });
         const hitArea = appendSvg(svg, 'rect', {
             class: 'dashboard-stripe-hit-area',
             x: margin.left,
@@ -1158,16 +1209,24 @@
         appendSvg(creditLink, 'text', {
             class: 'dashboard-stripe-credit-text',
             x: width - margin.right - 12,
-            y: height - margin.bottom - 16,
+            y: height - 16,
             'text-anchor': 'end'
-        }, 'Inspired by Ed Hawkins’ Warming Stripes ↗');
-        let activeIndex = -1;
+        }, 'Visualisation concept inspired by Ed Hawkins’ Warming Stripes ↗');
+        const peakLift = 50;
+        const standardDeviationInStripes = 10;
+        const standardDeviation = stripeWidth * standardDeviationInStripes;
+        let targetX = null;
+        let renderedX = null;
+        let previousPointerX = null;
+        let motionDirection = 1;
+        let motionFrame = null;
 
-        function stripeLift(distance) {
-            const peakLift = 50;
-            const standardDeviation = 10;
-            if (distance > standardDeviation * 3) return 0;
-            return peakLift * Math.exp(-(distance ** 2) / (2 * standardDeviation ** 2));
+        function stripeLift(stripeCentre, waveCentre) {
+            const distance = stripeCentre - waveCentre;
+            const trailingSide = motionDirection > 0 ? distance < 0 : distance > 0;
+            const localDeviation = standardDeviation * (trailingSide ? 1.3 : 0.72);
+            if (Math.abs(distance) > localDeviation * 3) return 0;
+            return peakLift * Math.exp(-(distance ** 2) / (2 * localDeviation ** 2));
         }
 
         function liftStripe(stripe, index, lift) {
@@ -1177,24 +1236,64 @@
             stripe.setAttribute('x', String(baseX));
             stripe.setAttribute('y', String(margin.top - lift));
             stripe.setAttribute('width', String(baseWidth));
+            stripe.setAttribute('height', String(chartHeight));
         }
 
-        function focusStripe(index) {
-            activeIndex = index;
+        function renderSilkWave() {
+            motionFrame = null;
+            if (!Number.isFinite(targetX)) return;
+            if (!Number.isFinite(renderedX)) renderedX = targetX;
+            renderedX += (targetX - renderedX) * 0.24;
+
             stripeElements.forEach((stripe, stripeIndex) => {
-                liftStripe(stripe, stripeIndex, stripeLift(Math.abs(stripeIndex - index)));
+                const stripeCentre = margin.left + (stripeIndex + 0.5) * stripeWidth;
+                liftStripe(stripe, stripeIndex, stripeLift(stripeCentre, renderedX));
             });
+            const sheenBias = motionDirection > 0 ? -standardDeviation * 0.16 : standardDeviation * 0.16;
+            sheen.setAttribute('x', String(renderedX + sheenBias - sheenWidth * 0.48));
+            sheen.setAttribute('opacity', '1');
+            const wavePoints = Array.from({ length: 65 }, (_, index) => {
+                const x = margin.left + chartWidth * index / 64;
+                const lift = stripeLift(x, renderedX);
+                return {
+                    x,
+                    top: margin.top - lift,
+                    bottom: margin.top + chartHeight - lift
+                };
+            });
+            const waveTop = wavePoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.top}`).join(' ');
+            const waveBottom = wavePoints.slice().reverse().map(point => `L ${point.x} ${point.bottom}`).join(' ');
+            waveClipShape.setAttribute('d', `${waveTop} ${waveBottom} Z`);
+            waveShadow.setAttribute('d', wavePoints.map((point, index) => (
+                `${index === 0 ? 'M' : 'L'} ${point.x} ${point.bottom + 5}`
+            )).join(' '));
+            waveShadow.setAttribute('opacity', '1');
+
+            if (Math.abs(targetX - renderedX) > 0.25) {
+                motionFrame = requestAnimationFrame(renderSilkWave);
+            }
         }
 
         hitArea.addEventListener('pointermove', event => {
             const bounds = svg.getBoundingClientRect();
             const pointerX = (event.clientX - bounds.left) * (width / bounds.width);
-            const index = Math.max(0, Math.min(records.length - 1, Math.floor((pointerX - margin.left) / stripeWidth)));
-            if (index !== activeIndex) focusStripe(index);
+            const clampedPointerX = Math.max(margin.left, Math.min(width - margin.right, pointerX));
+            if (Number.isFinite(previousPointerX) && Math.abs(clampedPointerX - previousPointerX) > 0.2) {
+                motionDirection = Math.sign(clampedPointerX - previousPointerX);
+            }
+            previousPointerX = clampedPointerX;
+            targetX = clampedPointerX;
+            if (motionFrame === null) motionFrame = requestAnimationFrame(renderSilkWave);
         });
         hitArea.addEventListener('pointerleave', () => {
-            activeIndex = -1;
+            targetX = null;
+            renderedX = null;
+            previousPointerX = null;
+            if (motionFrame !== null) cancelAnimationFrame(motionFrame);
+            motionFrame = null;
             stripeElements.forEach((stripe, index) => liftStripe(stripe, index, 0));
+            sheen.setAttribute('opacity', '0');
+            waveShadow.setAttribute('opacity', '0');
         });
 
         host.appendChild(svg);
