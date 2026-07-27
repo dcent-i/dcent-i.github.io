@@ -5,6 +5,7 @@
     'use strict';
 
     const DCENT_LIVE_DATA_URL = 'https://dl.dropboxusercontent.com/scl/fi/c8ohkby3kbq98jyx7c7i1/DCENT_DCENT_I_GMST_annual_statistics.txt?rlkey=wt7436fexkijiqfltnvt43681&st=px7uqc2n&dl=0';
+    const DCENT_MONTHLY_LIVE_DATA_URL = 'https://dl.dropboxusercontent.com/scl/fi/fuirz2t34i421d2nsehkr/DCENT_DCENT_I_GMST_monthly_statistics.txt?rlkey=yvh9slt1buw6ptx56rkpuwzhc&st=fkbmn0c9&dl=0';
     const BERKELEY_LIVE_DATA_URL = 'https://storage.googleapis.com/storage/v1/b/berkeley-earth-temperature-hr/o/global%2FGlobal_TAVG_annual.txt?alt=media';
     const NOAA_LIVE_DATA_URL = 'https://www.ncei.noaa.gov/data/noaa-global-surface-temperature/v6.1/access/timeseries/aravg.ann.land_ocean.90S.90N.v6.1.0.202606.asc';
     const HADCRUT_LOCAL_DATA_URL = 'data/HadCRUT.5.1.0.0.analysis.summary_series.global.annual.csv';
@@ -18,6 +19,7 @@
     const HOVER_POINT_RADIUS = 4.2;
     const VERTICAL_HIT_TOLERANCE_PX = 19;
     const SVG_NS = 'http://www.w3.org/2000/svg';
+    const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const SERIES_STYLES = {
         dcentI: {
             key: 'dcentI',
@@ -133,15 +135,18 @@
         const preindustrialMean = meanForPeriod(BASELINE_START_YEAR, BASELINE_END_YEAR);
         const commonOffset = alignmentMean - preindustrialMean;
 
-        return series.map(item => ({
-            ...item,
-            records: item.records.map(record => ({
-                ...record,
-                value: record.value + commonOffset,
-                ...(Number.isFinite(record.lower) ? { lower: record.lower + commonOffset } : {}),
-                ...(Number.isFinite(record.upper) ? { upper: record.upper + commonOffset } : {})
+        return {
+            commonOffset,
+            series: series.map(item => ({
+                ...item,
+                records: item.records.map(record => ({
+                    ...record,
+                    value: record.value + commonOffset,
+                    ...(Number.isFinite(record.lower) ? { lower: record.lower + commonOffset } : {}),
+                    ...(Number.isFinite(record.upper) ? { upper: record.upper + commonOffset } : {})
+                }))
             }))
-        }));
+        };
     }
 
     function completedYears(records) {
@@ -190,6 +195,71 @@
                 })))
             }
         ];
+    }
+
+    function parseMonthlyDcentSeries(text) {
+        const lines = text.replace(/\r/g, '').split('\n');
+        const headerIndices = lines.reduce((indices, line, index) => {
+            if (line.trim().startsWith('Year,')) indices.push(index);
+            return indices;
+        }, []);
+
+        if (headerIndices.length < 2) {
+            throw new Error('The live monthly data file does not contain both DCENT-I and DCENT tables.');
+        }
+
+        const latestCompletedYear = new Date().getFullYear() - 1;
+        const parseTable = (startIndex, endIndex) => lines.slice(startIndex + 1, endIndex)
+            .map(line => line.split(',').map(value => Number.parseFloat(value.trim())))
+            .filter(values => (
+                values.length >= 14
+                && Number.isInteger(values[0])
+                && values[0] === values[13]
+                && values.slice(1, 13).every(Number.isFinite)
+                && values[0] <= latestCompletedYear
+            ))
+            .map(values => ({
+                year: values[0],
+                months: values.slice(1, 13)
+            }));
+
+        const dcentI = parseTable(headerIndices[0], headerIndices[1]);
+        const dcent = parseTable(headerIndices[1], lines.length);
+        if (dcentI.length < 2 || dcent.length < 2) {
+            throw new Error('The live monthly data file does not contain enough complete years.');
+        }
+
+        return [
+            { key: 'dcentI', label: 'DCENT-I', records: dcentI },
+            { key: 'dcent', label: 'DCENT', records: dcent }
+        ];
+    }
+
+    function alignMonthlyToAnnualReference(datasets, annualOffset) {
+        if (!Number.isFinite(annualOffset)) {
+            throw new Error('The annual alignment offset is unavailable.');
+        }
+
+        return datasets.map(dataset => {
+            const monthlyBaselines = MONTH_LABELS.map((_, monthIndex) => {
+                const baselineValues = dataset.records
+                    .filter(record => record.year >= ALIGNMENT_START_YEAR && record.year <= ALIGNMENT_END_YEAR)
+                    .map(record => record.months[monthIndex]);
+                const expectedLength = ALIGNMENT_END_YEAR - ALIGNMENT_START_YEAR + 1;
+                if (baselineValues.length !== expectedLength || !baselineValues.every(Number.isFinite)) {
+                    throw new Error(`The monthly data do not contain a complete ${ALIGNMENT_START_YEAR}–${ALIGNMENT_END_YEAR} baseline.`);
+                }
+                return baselineValues.reduce((sum, value) => sum + value, 0) / baselineValues.length;
+            });
+
+            return {
+                ...dataset,
+                records: dataset.records.map(record => ({
+                    ...record,
+                    months: record.months.map((value, monthIndex) => value - monthlyBaselines[monthIndex] + annualOffset)
+                }))
+            };
+        });
     }
 
     function parseBerkeleySeries(text) {
@@ -649,6 +719,379 @@
         host.appendChild(svg);
     }
 
+    function blendColor(from, to, amount) {
+        const clampedAmount = Math.max(0, Math.min(1, amount));
+        return from.map((channel, index) => Math.round(channel + (to[index] - channel) * clampedAmount));
+    }
+
+    function rgbColor(channels) {
+        return `rgb(${channels.join(' ')})`;
+    }
+
+    function darkenRgbColor(color, amount = 0.34) {
+        const channels = (color.match(/\d+(?:\.\d+)?/g) || []).map(Number);
+        if (channels.length !== 3) return color;
+        return rgbColor(channels.map(channel => Math.round(channel * (1 - amount))));
+    }
+
+    function monthlyYearColor(year, firstYear, lastYear) {
+        const early = [204, 213, 225];
+        const yellow = [248, 202, 108];
+        const orange = [232, 99, 45];
+        const recent = [193, 42, 69];
+        if (year <= 1980) return rgbColor(early);
+        const proportion = (year - 1980) / Math.max(1, lastYear - 1980);
+        if (proportion <= 2 / 3) return rgbColor(blendColor(early, yellow, proportion / (2 / 3)));
+        if (proportion <= 0.9) return rgbColor(blendColor(yellow, orange, (proportion - 2 / 3) / (0.9 - 2 / 3)));
+        return rgbColor(blendColor(orange, recent, (proportion - 0.9) / 0.1));
+    }
+
+    function renderMonthlyChart(host, datasets) {
+        const width = 1100;
+        const height = 700;
+        const margin = { top: 20, right: 120, bottom: 102, left: 88 };
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+        const firstYear = Math.min(...datasets.flatMap(dataset => dataset.records.map(record => record.year)));
+        const lastYear = Math.max(...datasets.flatMap(dataset => dataset.records.map(record => record.year)));
+        const yMin = -0.7;
+        const yMax = 1.9;
+        const x = month => margin.left + ((month - 0.5) / 12) * chartWidth;
+        const y = value => margin.top + ((yMax - value) / (yMax - yMin)) * chartHeight;
+        const datasetByKey = new Map(datasets.map(dataset => [dataset.key, dataset]));
+        let selectedKey;
+
+        function lineForRecord(record, recordsByYear) {
+            const previousRecord = recordsByYear.get(record.year - 1);
+            const nextRecord = recordsByYear.get(record.year + 1);
+            const points = [
+                ...(previousRecord ? [{ month: 0.5, value: previousRecord.months[11] }] : []),
+                ...record.months.map((value, index) => ({ month: index + 1, value })),
+                ...(nextRecord ? [{ month: 12.5, value: nextRecord.months[0] }] : [])
+            ];
+            return points.map((point, index) => (
+                `${index === 0 ? 'M' : 'L'} ${x(point.month).toFixed(2)} ${y(point.value).toFixed(2)}`
+            )).join(' ');
+        }
+
+        function selectDataset(key) {
+            const dataset = datasetByKey.get(key);
+            if (!dataset) return;
+            selectedKey = key;
+            host.replaceChildren();
+            const recordsByYear = new Map(dataset.records.map(record => [record.year, record]));
+
+            const svg = svgEl('svg', {
+                viewBox: `0 0 ${width} ${height}`,
+                role: 'img',
+                'aria-label': `Monthly global mean surface temperature anomalies for ${dataset.label}, ${firstYear} to ${lastYear}`
+            });
+            const defs = appendSvg(svg, 'defs');
+            const clipPath = appendSvg(defs, 'clipPath', { id: 'monthly-gmst-clip' });
+            appendSvg(clipPath, 'rect', { x: margin.left, y: margin.top, width: chartWidth, height: chartHeight });
+            const transitionStart = 1980;
+
+            const grid = appendSvg(svg, 'g');
+            const minorGridStep = 0.1;
+            const majorGridStep = 0.5;
+            for (let gridValue = Math.ceil(yMin / minorGridStep) * minorGridStep; gridValue <= yMax + 0.001; gridValue += minorGridStep) {
+                const value = Math.round(gridValue * 100) / 100;
+                const isMajor = Math.abs(value / majorGridStep - Math.round(value / majorGridStep)) < 0.000001;
+                appendSvg(grid, 'line', {
+                    class: Math.abs(value) < 0.000001
+                        ? 'dashboard-zero-line'
+                        : isMajor ? 'dashboard-grid-line-major' : 'dashboard-grid-line-minor',
+                    x1: margin.left,
+                    x2: width - margin.right,
+                    y1: y(value),
+                    y2: y(value)
+                });
+                if (isMajor) {
+                    appendSvg(grid, 'text', {
+                        class: 'dashboard-tick dashboard-monthly-tick',
+                        x: margin.left - 12,
+                        y: y(value) + 6,
+                        'text-anchor': 'end'
+                    }, tickLabel(value, majorGridStep));
+                }
+            }
+            for (let monthBoundary = 0.5; monthBoundary <= 12.5; monthBoundary += 1) {
+                const monthX = x(monthBoundary);
+                const isSeasonBoundary = [2.5, 5.5, 8.5, 11.5].includes(monthBoundary);
+                appendSvg(grid, 'line', {
+                    class: isSeasonBoundary ? 'dashboard-monthly-season-grid-line' : 'dashboard-grid-line-minor',
+                    x1: monthX,
+                    x2: monthX,
+                    y1: margin.top,
+                    y2: height - margin.bottom
+                });
+            }
+            const yearKeyX = width - margin.right + 26;
+            const yearKeyY = margin.top;
+            const colorYears = Array.from(
+                { length: lastYear - firstYear + 1 },
+                (_, index) => lastYear - index
+            );
+            const yearKeyStepHeight = chartHeight / colorYears.length;
+            colorYears.forEach((year, index) => appendSvg(svg, 'rect', {
+                class: 'dashboard-monthly-year-key-step',
+                x: yearKeyX,
+                y: yearKeyY + index * yearKeyStepHeight,
+                width: 16,
+                height: yearKeyStepHeight + 0.25,
+                fill: monthlyYearColor(year, firstYear, lastYear)
+            }));
+            appendSvg(svg, 'rect', {
+                class: 'dashboard-monthly-year-key',
+                x: yearKeyX,
+                y: yearKeyY,
+                width: 16,
+                height: chartHeight
+            });
+            const yearKeyHighlight = appendSvg(svg, 'rect', {
+                class: 'dashboard-monthly-year-key-highlight',
+                visibility: 'hidden'
+            });
+            appendSvg(svg, 'text', {
+                class: 'dashboard-monthly-year-key-label',
+                x: yearKeyX + 24,
+                y: yearKeyY + 14
+            }, String(lastYear));
+            appendSvg(svg, 'text', {
+                class: 'dashboard-monthly-year-key-label',
+                x: yearKeyX + 24,
+                y: yearKeyY + chartHeight
+            }, String(firstYear));
+            const yearKeyHitArea = appendSvg(svg, 'rect', {
+                class: 'dashboard-monthly-year-key-hit-area',
+                x: yearKeyX - 8,
+                y: yearKeyY,
+                width: 32,
+                height: chartHeight
+            });
+
+            const dataLayer = appendSvg(svg, 'g', { 'clip-path': 'url(#monthly-gmst-clip)' });
+            const lineLayer = appendSvg(dataLayer, 'g');
+            const interactionLayer = appendSvg(dataLayer, 'g', { class: 'dashboard-monthly-interaction-layer' });
+            const latestYear = dataset.records[dataset.records.length - 1].year;
+            const lineStates = dataset.records.map(record => {
+                const color = monthlyYearColor(record.year, firstYear, lastYear);
+                const line = appendSvg(lineLayer, 'path', {
+                    class: 'dashboard-monthly-line',
+                    d: lineForRecord(record, recordsByYear)
+                });
+                const hitLine = appendSvg(interactionLayer, 'path', {
+                    class: 'dashboard-monthly-hit-line',
+                    d: lineForRecord(record, recordsByYear)
+                });
+                return { record, color, highlightColor: darkenRgbColor(color), line, hitLine };
+            });
+            const lineStatesByYear = new Map(lineStates.map(state => [state.record.year, state]));
+            const hoverGridLines = [];
+            for (let gridValue = Math.ceil(yMin * 10) / 10; gridValue <= yMax + 0.001; gridValue += 0.1) {
+                const value = Math.round(gridValue * 10) / 10;
+                hoverGridLines.push(appendSvg(lineLayer, 'line', {
+                    class: 'dashboard-monthly-hover-grid-line',
+                    x1: margin.left,
+                    x2: width - margin.right,
+                    y1: y(value),
+                    y2: y(value)
+                }));
+            }
+
+            const interactionBackground = svgEl('rect', {
+                class: 'dashboard-monthly-hit-background',
+                x: margin.left,
+                y: margin.top,
+                width: chartWidth,
+                height: chartHeight
+            });
+            interactionLayer.insertBefore(interactionBackground, interactionLayer.firstChild);
+
+            const parisLimit = 1.5;
+            if (parisLimit >= yMin && parisLimit <= yMax) {
+                const parisY = y(parisLimit);
+                appendSvg(svg, 'line', {
+                    class: 'dashboard-paris-limit-line',
+                    x1: margin.left,
+                    x2: width - margin.right,
+                    y1: parisY,
+                    y2: parisY
+                });
+            }
+
+            const axis = appendSvg(svg, 'g');
+            appendSvg(axis, 'line', {
+                class: 'dashboard-axis',
+                x1: margin.left,
+                x2: width - margin.right,
+                y1: height - margin.bottom,
+                y2: height - margin.bottom
+            });
+            appendSvg(axis, 'line', {
+                class: 'dashboard-axis',
+                x1: margin.left,
+                x2: margin.left,
+                y1: margin.top,
+                y2: height - margin.bottom
+            });
+            MONTH_LABELS.forEach((month, index) => {
+                const monthX = x(index + 1);
+                appendSvg(axis, 'line', {
+                    class: 'dashboard-axis',
+                    x1: monthX,
+                    x2: monthX,
+                    y1: height - margin.bottom,
+                    y2: height - margin.bottom + 6
+                });
+                appendSvg(axis, 'text', {
+                    class: 'dashboard-tick dashboard-monthly-tick',
+                    x: monthX,
+                    y: height - margin.bottom + 29,
+                    'text-anchor': 'middle'
+                }, month);
+            });
+            appendSvg(axis, 'text', {
+                class: 'dashboard-axis-label dashboard-monthly-axis-label',
+                x: margin.left + chartWidth / 2,
+                y: height - 10,
+                'text-anchor': 'middle'
+            }, 'Month');
+            appendSvg(axis, 'text', {
+                class: 'dashboard-axis-label dashboard-monthly-axis-label',
+                x: 23,
+                y: margin.top + chartHeight / 2,
+                transform: `rotate(-90 23 ${margin.top + chartHeight / 2})`,
+                'text-anchor': 'middle'
+            }, 'GMST anomalies (°C)');
+
+            const latestPointLayer = appendSvg(svg, 'g', { class: 'dashboard-monthly-point-layer' });
+            const hoverPointLayer = appendSvg(svg, 'g', { class: 'dashboard-monthly-point-layer' });
+            const latestRecord = dataset.records.find(record => record.year === latestYear);
+            latestRecord.months.forEach((value, monthIndex) => appendSvg(latestPointLayer, 'circle', {
+                class: 'dashboard-monthly-latest-point',
+                cx: x(monthIndex + 1),
+                cy: y(value),
+                r: 7
+            }));
+
+            const tooltipWidth = 60;
+            const tooltipHeight = 31;
+            const tooltip = appendSvg(svg, 'g', { class: 'dashboard-monthly-tooltip', visibility: 'hidden' });
+            appendSvg(tooltip, 'rect', { class: 'dashboard-monthly-tooltip-background', width: tooltipWidth, height: tooltipHeight, rx: 4 });
+            const tooltipText = appendSvg(tooltip, 'text', {
+                class: 'dashboard-monthly-tooltip-text',
+                x: tooltipWidth / 2,
+                y: 22,
+                'text-anchor': 'middle'
+            });
+            let highlightedState;
+
+            function restingStrokeWidth(year) {
+                if (year <= 1980) return 1.05;
+                const yearsFromLatest = lastYear - year;
+                if (yearsFromLatest === 0) return 3.9;
+                if (yearsFromLatest === 1) return 3.0;
+                if (yearsFromLatest === 2) return 2.5;
+                return 1.05 + ((year - 1980) / (lastYear - 1980)) * 1.15;
+            }
+
+            function applyRestingStyle(state) {
+                state.line.style.stroke = state.color;
+                state.line.style.strokeWidth = String(restingStrokeWidth(state.record.year));
+                state.line.style.opacity = state.record.year === latestYear ? '1' : '0.7';
+            }
+
+            function clearHighlight() {
+                if (!highlightedState) return;
+                lineStates.forEach(applyRestingStyle);
+                latestPointLayer.style.opacity = '1';
+                hoverPointLayer.replaceChildren();
+                hoverGridLines.forEach(line => { line.style.opacity = '0'; });
+                yearKeyHighlight.setAttribute('visibility', 'hidden');
+                tooltip.setAttribute('visibility', 'hidden');
+                highlightedState = undefined;
+            }
+
+            function showHoverGrid() {
+                hoverGridLines.forEach(line => { line.style.opacity = '1'; });
+            }
+
+            function moveTooltip(state) {
+                const yearIndex = lastYear - state.record.year;
+                const yearCentreY = yearKeyY + (yearIndex + 0.5) * yearKeyStepHeight;
+                const tooltipX = yearKeyX + 24;
+                const tooltipY = Math.max(0, Math.min(height - tooltipHeight, yearCentreY - tooltipHeight / 2));
+                tooltip.setAttribute('transform', `translate(${tooltipX} ${tooltipY})`);
+                tooltipText.textContent = String(state.record.year);
+                tooltipText.style.fill = state.highlightColor;
+                tooltip.setAttribute('visibility', 'visible');
+            }
+
+            function highlight(state, event) {
+                if (highlightedState !== state) {
+                    highlightedState = state;
+                    lineStates.forEach(candidate => {
+                        const isHighlighted = candidate === state;
+                        candidate.line.style.stroke = isHighlighted ? candidate.highlightColor : candidate.color;
+                        candidate.line.style.strokeWidth = isHighlighted
+                            ? String(Math.max(2.9, restingStrokeWidth(candidate.record.year) + 0.65))
+                            : '1.0';
+                        candidate.line.style.opacity = isHighlighted ? '1' : '0.32';
+                    });
+                    showHoverGrid();
+                    lineLayer.appendChild(state.line);
+                    latestPointLayer.style.opacity = state.record.year === latestYear ? '1' : '0';
+                    hoverPointLayer.replaceChildren();
+                    state.record.months.forEach((value, monthIndex) => appendSvg(hoverPointLayer, 'circle', {
+                        class: 'dashboard-monthly-hover-point',
+                        cx: x(monthIndex + 1),
+                        cy: y(value),
+                        r: state.record.year === latestYear ? 7 : 5,
+                        style: `fill:${state.highlightColor}`
+                    }));
+                    const yearIndex = lastYear - state.record.year;
+                    yearKeyHighlight.setAttribute('x', String(yearKeyX - 2));
+                    yearKeyHighlight.setAttribute('y', String(yearKeyY + yearIndex * yearKeyStepHeight - 1));
+                    yearKeyHighlight.setAttribute('width', '20');
+                    yearKeyHighlight.setAttribute('height', String(yearKeyStepHeight + 2));
+                    yearKeyHighlight.style.stroke = state.highlightColor;
+                    yearKeyHighlight.setAttribute('visibility', 'visible');
+                }
+                moveTooltip(state);
+            }
+
+            lineStates.forEach(state => {
+                applyRestingStyle(state);
+                state.hitLine.addEventListener('pointerenter', event => highlight(state, event));
+                state.hitLine.addEventListener('pointermove', event => highlight(state, event));
+                state.hitLine.addEventListener('pointerleave', event => {
+                    const nextTarget = event.relatedTarget;
+                    if (!(nextTarget instanceof Element && nextTarget.classList.contains('dashboard-monthly-hit-line'))) {
+                        clearHighlight();
+                    }
+                });
+            });
+            interactionBackground.addEventListener('pointermove', clearHighlight);
+            yearKeyHitArea.addEventListener('pointermove', event => {
+                const bounds = svg.getBoundingClientRect();
+                const pointerY = (event.clientY - bounds.top) * (height / bounds.height);
+                const yearIndex = Math.max(0, Math.min(
+                    colorYears.length - 1,
+                    Math.floor((pointerY - yearKeyY) / yearKeyStepHeight)
+                ));
+                highlight(lineStatesByYear.get(colorYears[yearIndex]), event);
+            });
+            yearKeyHitArea.addEventListener('pointerleave', clearHighlight);
+            svg.addEventListener('pointerleave', clearHighlight);
+
+            host.appendChild(svg);
+        }
+
+        selectDataset('dcentI');
+        return { selectDataset, selectedKey: () => selectedKey };
+    }
+
     function initialiseCarousel(carousel) {
         const viewport = carousel.querySelector('.dashboard-carousel-viewport');
         const slides = [...carousel.querySelectorAll('.dashboard-slide')];
@@ -737,10 +1180,22 @@
                         </section>
                     </article>
                     <article class="dashboard-slide" aria-labelledby="monthly-panel-heading">
-                        <section class="dashboard-panel dashboard-panel--placeholder">
-                            <span class="dashboard-panel-eyebrow">Next view</span>
-                            <h2 id="monthly-panel-heading">Monthly time series</h2>
-                            <p>This panel is reserved for the monthly data view. No chart is shown until its source data and presentation are defined.</p>
+                        <section class="dashboard-panel">
+                            <div class="dashboard-panel-heading">
+                                <div>
+                                    <h2 id="monthly-panel-heading">Monthly Global Mean Surface Temperature Anomalies (GMST)</h2>
+                                    <p class="dashboard-panel-subtitle" aria-hidden="true">&nbsp;</p>
+                                </div>
+                            </div>
+                            <figure class="dashboard-figure">
+                                <div class="dashboard-chart-frame">
+                                    <div class="dashboard-chart dashboard-monthly-chart" role="status"><p class="dashboard-status">Loading monthly GMST data…</p></div>
+                                </div>
+                                <div class="dashboard-monthly-controls" role="group" aria-label="Choose the monthly GMST product">
+                                    <button class="dashboard-monthly-product is-active" type="button" data-monthly-product="dcentI" aria-pressed="true">DCENT-I</button>
+                                    <button class="dashboard-monthly-product" type="button" data-monthly-product="dcent" aria-pressed="false">DCENT</button>
+                                </div>
+                            </figure>
                         </section>
                     </article>
                     <article class="dashboard-slide" aria-labelledby="maps-panel-heading">
@@ -764,7 +1219,36 @@
                 </nav>
             </section>`;
 
-        const chartHost = content.querySelector('.dashboard-chart');
+        const chartHost = content.querySelector('.dashboard-chart:not(.dashboard-monthly-chart)');
+        const monthlyChartHost = content.querySelector('.dashboard-monthly-chart');
+        const monthlyProductButtons = [...content.querySelectorAll('[data-monthly-product]')];
+        let annualCommonOffset;
+        let monthlyRawDatasets;
+        let monthlyChart;
+
+        function setMonthlyProduct(key) {
+            if (!monthlyChart) return;
+            monthlyChart.selectDataset(key);
+            monthlyProductButtons.forEach(button => {
+                const isActive = button.dataset.monthlyProduct === key;
+                button.classList.toggle('is-active', isActive);
+                button.setAttribute('aria-pressed', String(isActive));
+            });
+        }
+
+        function renderMonthlyWhenReady() {
+            if (!monthlyRawDatasets || !Number.isFinite(annualCommonOffset)) return;
+            monthlyChartHost.removeAttribute('role');
+            monthlyChart = renderMonthlyChart(
+                monthlyChartHost,
+                alignMonthlyToAnnualReference(monthlyRawDatasets, annualCommonOffset)
+            );
+            setMonthlyProduct('dcentI');
+        }
+
+        monthlyProductButtons.forEach(button => {
+            button.addEventListener('click', () => setMonthlyProduct(button.dataset.monthlyProduct));
+        });
         initialiseCarousel(content.querySelector('.dashboard-carousel'));
         Promise.allSettled([
             fetchLiveText(DCENT_LIVE_DATA_URL).then(parseDcentSeries),
@@ -799,19 +1283,34 @@
                     console.warn('Unable to load NOAA GlobalTemp annual GMST data:', noaaResult.reason);
                 }
 
+                const annualAlignment = alignToCommonPreindustrialReference(series);
+                annualCommonOffset = annualAlignment.commonOffset;
                 chartHost.removeAttribute('role');
                 const subtitle = content.querySelector('.dashboard-panel-subtitle');
-                renderChart(chartHost, alignToCommonPreindustrialReference(series), activeSeries => {
+                renderChart(chartHost, annualAlignment.series, activeSeries => {
                     const ranking = latestYearRanking(activeSeries.records, activeSeries.label);
                     subtitle.innerHTML = rankingSubtitle(ranking).replace(
                         ordinal(ranking.rank),
                         `<span class="dashboard-panel-rank">${ordinal(ranking.rank)}</span>`
                     );
                 });
+                renderMonthlyWhenReady();
             })
             .catch(error => {
                 chartHost.innerHTML = `<p class="dashboard-status error">The annual GMST data could not be loaded. Please try again later.</p>`;
+                monthlyChartHost.innerHTML = `<p class="dashboard-status error">The monthly GMST data could not be aligned because the annual GMST reference could not be loaded.</p>`;
                 console.error('Unable to load annual GMST data:', error);
+            });
+
+        fetchLiveText(DCENT_MONTHLY_LIVE_DATA_URL)
+            .then(parseMonthlyDcentSeries)
+            .then(datasets => {
+                monthlyRawDatasets = datasets;
+                renderMonthlyWhenReady();
+            })
+            .catch(error => {
+                monthlyChartHost.innerHTML = `<p class="dashboard-status error">The monthly GMST data could not be loaded. Please try again later.</p>`;
+                console.error('Unable to load monthly GMST data:', error);
             });
     }
 
