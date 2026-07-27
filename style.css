@@ -49,8 +49,9 @@ b, strong {font-family: 'Calibri', sans-serif; font-weight: 600;  color: #5573b3
 .dashboard-shell{min-height:24rem}
 .dashboard-content{min-height:16rem}
 .dashboard-carousel{width:100%}
-.dashboard-carousel-viewport{display:flex;overflow-x:auto;overscroll-behavior-x:contain;padding:0 10% .5rem 0;scroll-behavior:smooth;scroll-snap-type:x mandatory;scrollbar-width:none}
+.dashboard-carousel-viewport{display:flex;overflow-x:auto;overscroll-behavior-x:contain;padding:0 0 .5rem;scroll-behavior:smooth;scroll-snap-type:x mandatory;scrollbar-width:none}
 .dashboard-carousel-viewport::-webkit-scrollbar{display:none}
+.dashboard-carousel-viewport::after{content:"";flex:0 0 10%;pointer-events:none}
 .dashboard-slide{flex:0 0 90%;min-width:0;scroll-snap-align:start;scroll-snap-stop:always}
 .dashboard-slide + .dashboard-slide{border-left:2px solid var(--b100);padding-left:1.25rem}
 .dashboard-panel{background:#fff;padding:.8rem;height:100%}
