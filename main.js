@@ -32,12 +32,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 2.2 处理动态引入 (include-html)
     const elements = document.querySelectorAll('[include-html]');
+    const includeLoads = [];
 
     elements.forEach(el => {
         const file = el.getAttribute('include-html');
         
         if (file) {
-            fetch(file)
+            const includeLoad = fetch(file)
             .then(response => {
                 if (response.ok) return response.text();
                 throw new Error('Page not found');
@@ -50,6 +51,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 // A. 重新渲染引用
                 renderReferences(el); 
 
+                // Let section-specific scripts initialise after their HTML is available.
+                el.dispatchEvent(new CustomEvent('include-html-loaded', {
+                    bubbles: true,
+                    detail: { file: file }
+                }));
+
                 // B. 【全局修复】尝试初始化折叠功能
                 // 检查被加载内容的父级 ID 是否在配置表中
                 if (el.parentElement && TOGGLE_CONFIG[el.parentElement.id]) {
@@ -60,7 +67,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 el.innerHTML = "Could not load file: " + file;
                 console.error(err);
             });
+            includeLoads.push(includeLoad);
         }
+    });
+
+    // Includes change the document height after the browser has handled an initial hash.
+    // Re-apply it once all section content is in place.
+    Promise.all(includeLoads).then(() => {
+        if (location.hash) smoothScrollTo(location.hash);
+        else updateActive();
     });
 
     // 2.3 【全局修复】处理页面上已有的静态内容 (非 include 加载的部分)
