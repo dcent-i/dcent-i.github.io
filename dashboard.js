@@ -211,30 +211,55 @@
         }
 
         const latestCompletedYear = new Date().getFullYear() - 1;
-        const parseTable = (startIndex, endIndex) => lines.slice(startIndex + 1, endIndex)
-            .map(line => line.split(',').map(value => Number.parseFloat(value.trim())))
-            .filter(values => (
-                values.length >= 14
-                && Number.isInteger(values[0])
-                && values[0] === values[13]
-                && values.slice(1, 13).every(Number.isFinite)
-                && values[0] <= latestCompletedYear
-            ))
-            .map(values => ({
-                year: values[0],
-                months: values.slice(1, 13)
-            }));
+        const parseTable = (startIndex, endIndex) => {
+            const rows = lines.slice(startIndex + 1, endIndex)
+                .map(line => line.split(',').map(value => value.trim()))
+                .filter(values => values.length >= 14 && /^\d{4}$/.test(values[0]))
+                .map(values => ({
+                    year: Number.parseInt(values[0], 10),
+                    months: values.slice(1, 13).map(value => Number.parseFloat(value)),
+                    closingYear: Number.parseInt(values[13], 10)
+                }));
+            const availableMonths = rows
+                .flatMap(row => row.months.map((value, monthIndex) => (
+                    Number.isFinite(value) ? { year: row.year, monthIndex } : null
+                )))
+                .filter(Boolean)
+                .sort((a, b) => a.year - b.year || a.monthIndex - b.monthIndex);
+
+            return {
+                coverage: availableMonths.length ? {
+                    start: availableMonths[0],
+                    end: availableMonths[availableMonths.length - 1]
+                } : null,
+                records: rows
+                    .filter(row => (
+                        row.closingYear === row.year
+                        && row.months.every(Number.isFinite)
+                        && row.year <= latestCompletedYear
+                    ))
+                    .map(row => ({ year: row.year, months: row.months }))
+            };
+        };
 
         const dcentI = parseTable(headerIndices[0], headerIndices[1]);
         const dcent = parseTable(headerIndices[1], lines.length);
-        if (dcentI.length < 2 || dcent.length < 2) {
+        if (dcentI.records.length < 2 || dcent.records.length < 2) {
             throw new Error('The live monthly data file does not contain enough complete years.');
         }
 
         return [
-            { key: 'dcentI', label: 'DCENT-I', records: dcentI },
-            { key: 'dcent', label: 'DCENT', records: dcent }
+            { key: 'dcentI', label: 'DCENT-I', records: dcentI.records, coverage: dcentI.coverage },
+            { key: 'dcent', label: 'DCENT', records: dcent.records, coverage: dcent.coverage }
         ];
+    }
+
+    function updateSidebarCoverage(datasets) {
+        const label = document.querySelector('[data-monthly-coverage]');
+        const coverage = datasets.find(dataset => dataset.key === 'dcentI')?.coverage;
+        if (!label || !coverage) return;
+        const formatMonth = ({ year, monthIndex }) => `${MONTH_LABELS[monthIndex]}. ${year}`;
+        label.textContent = `${formatMonth(coverage.start)} – ${formatMonth(coverage.end)}`;
     }
 
     function alignMonthlyToAnnualReference(datasets, annualOffset) {
@@ -1541,6 +1566,7 @@
             .then(parseMonthlyDcentSeries)
             .then(datasets => {
                 monthlyRawDatasets = datasets;
+                updateSidebarCoverage(datasets);
                 renderMonthlyWhenReady();
             })
             .catch(error => {
