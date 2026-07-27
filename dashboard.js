@@ -1164,10 +1164,10 @@
         let activeIndex = -1;
 
         function stripeLift(distance) {
-            if (distance === 0) return 14;
-            if (distance === 1) return 8;
-            if (distance === 2) return 3;
-            return 0;
+            const peakLift = 50;
+            const standardDeviation = 10;
+            if (distance > standardDeviation * 3) return 0;
+            return peakLift * Math.exp(-(distance ** 2) / (2 * standardDeviation ** 2));
         }
 
         function liftStripe(stripe, index, lift) {
@@ -1181,15 +1181,9 @@
 
         function focusStripe(index) {
             activeIndex = index;
-            const affected = stripeElements
-                .map((stripe, stripeIndex) => ({ stripe, stripeIndex, distance: Math.abs(stripeIndex - index) }))
-                .filter(item => item.distance <= 2)
-                .sort((a, b) => b.distance - a.distance);
-
             stripeElements.forEach((stripe, stripeIndex) => {
                 liftStripe(stripe, stripeIndex, stripeLift(Math.abs(stripeIndex - index)));
             });
-            affected.forEach(({ stripe }) => stripeLayer.appendChild(stripe));
         }
 
         hitArea.addEventListener('pointermove', event => {
