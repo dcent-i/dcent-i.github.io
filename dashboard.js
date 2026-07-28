@@ -23,6 +23,13 @@
     const SVG_NS = 'http://www.w3.org/2000/svg';
     const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const SPATIAL_MAP_GRID = { longitudes: 72, latitudes: 36 };
+    const DCENT_MISSING_CELL_COLOR = '#d7d7d7';
+    const SPATIAL_SIGNAL_COLOR_BANDS = [
+        [47, 20, 160], [35, 29, 184], [27, 51, 199], [31, 78, 211], [47, 105, 218], [72, 136, 222],
+        [103, 166, 220], [137, 194, 222], [169, 219, 224], [198, 235, 231], [225, 244, 237], [246, 248, 238],
+        [255, 251, 239], [251, 235, 218], [249, 215, 195], [249, 190, 166], [248, 164, 139], [247, 136, 112],
+        [241, 106, 91], [234, 78, 73], [220, 53, 64], [197, 37, 61], [173, 26, 57], [146, 18, 51]
+    ];
     const SPATIAL_MAP_URLS = {
         dcentI: {
             annual: 'https://dl.dropboxusercontent.com/scl/fi/soac74wlws2oop62glahg/DCENT-I_latest_year.txt?rlkey=mlpctb79rlbkuenihpu8v6wgv&dl=0',
@@ -59,6 +66,7 @@
             ]
         }
     };
+    const WORLD_BOUNDARIES_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
     const SERIES_STYLES = {
         dcentI: {
             key: 'dcentI',
@@ -1403,12 +1411,8 @@
     }
 
     function spatialSignalColor(value) {
-        const cool = [48, 104, 183];
-        const neutral = [248, 249, 252];
-        const warm = [194, 43, 63];
-        const limit = 5;
-        if (value <= 0) return rgbColor(blendColor(cool, neutral, Math.max(0, (value + limit) / limit)));
-        return rgbColor(blendColor(neutral, warm, Math.min(1, value / limit)));
+        const normalizedValue = Math.max(0, Math.min(0.999999, (value + 4) / 8));
+        return rgbColor(SPATIAL_SIGNAL_COLOR_BANDS[Math.floor(normalizedValue * SPATIAL_SIGNAL_COLOR_BANDS.length)]);
     }
 
     function spatialRankColor(rank) {
@@ -1422,65 +1426,150 @@
         return `${MONTH_LABELS[frame.month - 1]} ${frame.year}`;
     }
 
-    function drawSpatialMap(canvas, frame, metric) {
+    function parseWorldBoundaryPaths(text) {
+        const topology = JSON.parse(text);
+        const countries = topology.objects && topology.objects.countries;
+        const transform = topology.transform;
+        if (!countries || !transform || !Array.isArray(topology.arcs)) {
+            throw new Error('The world boundary file does not contain the expected TopoJSON data.');
+        }
+
+        const arcUses = new Map();
+        const collectArcIndexes = arcs => {
+            if (Array.isArray(arcs)) {
+                arcs.forEach(collectArcIndexes);
+            } else if (Number.isInteger(arcs)) {
+                const index = arcs < 0 ? ~arcs : arcs;
+                arcUses.set(index, (arcUses.get(index) || 0) + 1);
+            }
+        };
+        const collectGeometry = geometry => {
+            if (geometry.type === 'GeometryCollection') {
+                geometry.geometries.forEach(collectGeometry);
+            } else {
+                collectArcIndexes(geometry.arcs);
+            }
+        };
+        collectGeometry(countries);
+
+        const decodeArc = index => {
+            const arc = topology.arcs[index];
+            if (!arc) throw new Error('The world boundary file references a missing arc.');
+            let longitude = 0;
+            let latitude = 0;
+            return arc.map(([deltaLongitude, deltaLatitude]) => {
+                longitude += deltaLongitude;
+                latitude += deltaLatitude;
+                return [
+                    longitude * transform.scale[0] + transform.translate[0],
+                    latitude * transform.scale[1] + transform.translate[1]
+                ];
+            });
+        };
+
+        return [...arcUses].reduce((paths, [index, uses]) => {
+            paths[uses === 1 ? 'coastlines' : 'borders'].push(decodeArc(index));
+            return paths;
+        }, { coastlines: [], borders: [] });
+    }
+
+    function robinsonRelativeLongitude(longitude) {
+        let relativeLongitude = longitude - 180;
+        while (relativeLongitude < -180) relativeLongitude += 360;
+        while (relativeLongitude > 180) relativeLongitude -= 360;
+        return longitude === 360 ? 180 : relativeLongitude;
+    }
+
+    function createRobinsonProjection(width, height) {
+        const xCoefficients = [1, 0.9986, 0.9954, 0.99, 0.9822, 0.973, 0.96, 0.9427, 0.9216, 0.8962, 0.8679, 0.835, 0.7986, 0.7597, 0.7186, 0.6732, 0.6213, 0.5722, 0.5322];
+        const yCoefficients = [0, 0.062, 0.124, 0.186, 0.248, 0.31, 0.372, 0.434, 0.4958, 0.5571, 0.6176, 0.6769, 0.7346, 0.7903, 0.8435, 0.8936, 0.9394, 0.9761, 1];
+        const xScale = 0.8487;
+        const yScale = 1.3523;
+        const scale = Math.min(
+            (width - 48) / (2 * xScale * Math.PI),
+            (height - 44) / (2 * yScale)
+        );
+        const centreX = width / 2;
+        const centreY = height / 2;
+
+        const interpolate = (coefficients, latitude) => {
+            const position = Math.min(90, Math.abs(latitude)) / 5;
+            const lowerIndex = Math.floor(position);
+            const upperIndex = Math.min(coefficients.length - 1, lowerIndex + 1);
+            return coefficients[lowerIndex] + (coefficients[upperIndex] - coefficients[lowerIndex]) * (position - lowerIndex);
+        };
+
+        return (longitude, latitude) => {
+            const relativeLongitude = robinsonRelativeLongitude(longitude);
+            const xCoefficient = interpolate(xCoefficients, latitude);
+            const yCoefficient = interpolate(yCoefficients, latitude);
+            return {
+                x: centreX + xScale * scale * (relativeLongitude * Math.PI / 180) * xCoefficient,
+                y: centreY - Math.sign(latitude) * yScale * scale * yCoefficient
+            };
+        };
+    }
+
+    function drawProjectedBoundaryPath(context, coordinates, project) {
+        context.beginPath();
+        let previousLongitude;
+        coordinates.forEach(([longitude, latitude], index) => {
+            const point = project(longitude, latitude);
+            const crossesMapSeam = index > 0
+                && Math.abs(robinsonRelativeLongitude(longitude) - robinsonRelativeLongitude(previousLongitude)) > 180;
+            if (index === 0 || crossesMapSeam) context.moveTo(point.x, point.y);
+            else context.lineTo(point.x, point.y);
+            previousLongitude = longitude;
+        });
+        context.stroke();
+    }
+
+    function drawSpatialMap(canvas, frame, metric, product, boundaryPaths) {
         const context = canvas.getContext('2d');
         const width = canvas.width;
         const height = canvas.height;
-        const map = { left: 56, top: 20, width: 1016, height: 508 };
-        const cellWidth = map.width / SPATIAL_MAP_GRID.longitudes;
-        const cellHeight = map.height / SPATIAL_MAP_GRID.latitudes;
+        const project = createRobinsonProjection(width, height);
         const field = metric === 'signal' ? frame.values : frame.rankings;
 
         context.clearRect(0, 0, width, height);
-        context.fillStyle = '#f8faff';
-        context.fillRect(map.left, map.top, map.width, map.height);
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, width, height);
 
         for (let longitudeIndex = 0; longitudeIndex < SPATIAL_MAP_GRID.longitudes; longitudeIndex += 1) {
             for (let latitudeIndex = 0; latitudeIndex < SPATIAL_MAP_GRID.latitudes; latitudeIndex += 1) {
                 const value = field[longitudeIndex * SPATIAL_MAP_GRID.latitudes + latitudeIndex];
-                if (!Number.isFinite(value) || (metric === 'rank' && value < 1)) continue;
-                context.fillStyle = metric === 'signal'
-                    ? spatialSignalColor(value)
-                    : spatialRankColor(value);
-                context.fillRect(
-                    map.left + longitudeIndex * cellWidth,
-                    map.top + (SPATIAL_MAP_GRID.latitudes - latitudeIndex - 1) * cellHeight,
-                    cellWidth + 0.25,
-                    cellHeight + 0.25
-                );
+                const west = longitudeIndex * 5;
+                const east = west + 5;
+                const south = -90 + latitudeIndex * 5;
+                const north = south + 5;
+                const isMissing = !Number.isFinite(value) || (metric === 'rank' && value < 1);
+                if (isMissing && product !== 'dcent') continue;
+                context.fillStyle = isMissing
+                    ? DCENT_MISSING_CELL_COLOR
+                    : metric === 'signal'
+                        ? spatialSignalColor(value)
+                        : spatialRankColor(value);
+                const corners = [[west, south], [east, south], [east, north], [west, north]];
+                context.beginPath();
+                corners.forEach(([longitude, latitude], index) => {
+                    const point = project(longitude, latitude);
+                    if (index === 0) context.moveTo(point.x, point.y);
+                    else context.lineTo(point.x, point.y);
+                });
+                context.closePath();
+                context.fill();
             }
         }
 
         context.save();
-        context.strokeStyle = 'rgba(46, 76, 130, 0.27)';
-        context.lineWidth = 1;
-        [-60, -30, 0, 30, 60].forEach(latitude => {
-            const y = map.top + ((90 - latitude) / 180) * map.height;
-            context.beginPath();
-            context.moveTo(map.left, y);
-            context.lineTo(map.left + map.width, y);
-            context.stroke();
-        });
-        [0, 90, 180, 270, 360].forEach(longitude => {
-            const x = map.left + (longitude / 360) * map.width;
-            context.beginPath();
-            context.moveTo(x, map.top);
-            context.lineTo(x, map.top + map.height);
-            context.stroke();
-        });
-        context.strokeStyle = '#aebfdf';
-        context.strokeRect(map.left, map.top, map.width, map.height);
-        context.fillStyle = '#5570a9';
-        context.font = '500 18px Calibri, Arial, sans-serif';
-        context.textAlign = 'center';
-        [['0°', 0], ['90°E', 90], ['180°', 180], ['90°W', 270]].forEach(([label, longitude]) => {
-            context.fillText(label, map.left + (longitude / 360) * map.width, map.top + map.height + 29);
-        });
-        context.textAlign = 'right';
-        [-60, -30, 0, 30, 60].forEach(latitude => {
-            const y = map.top + ((90 - latitude) / 180) * map.height;
-            context.fillText(`${Math.abs(latitude)}°${latitude < 0 ? 'S' : latitude > 0 ? 'N' : ''}`, map.left - 9, y + 6);
-        });
+        context.lineJoin = 'round';
+        context.lineCap = 'round';
+        context.strokeStyle = 'rgba(20, 26, 36, 0.95)';
+        context.lineWidth = 1.65;
+        boundaryPaths.coastlines.forEach(path => drawProjectedBoundaryPath(context, path, project));
+        context.strokeStyle = 'rgba(20, 26, 36, 0.8)';
+        context.lineWidth = 0.72;
+        boundaryPaths.borders.forEach(path => drawProjectedBoundaryPath(context, path, project));
         context.restore();
     }
 
@@ -1496,6 +1585,7 @@
         const nextMonth = host.querySelector('[data-spatial-next-month]');
         const monthNavigation = host.querySelector('[data-spatial-month-navigation]');
         const cache = new Map();
+        let boundaryPathsPromise;
         let timeMode = 'annual';
         let product = 'dcentI';
         let metric = 'signal';
@@ -1539,21 +1629,26 @@
         function updateLegend(frame) {
             if (metric === 'signal') {
                 legend.innerHTML = `
-                    <span class="dashboard-spatial-legend-label">Warming signal</span>
-                    <span class="dashboard-spatial-gradient dashboard-spatial-gradient--signal" aria-hidden="true"></span>
-                    <span class="dashboard-spatial-legend-range">−5 °C</span>
-                    <span class="dashboard-spatial-legend-zero">0</span>
-                    <span class="dashboard-spatial-legend-range">+5 °C</span>`;
+                    <div class="dashboard-spatial-legend-scale">
+                        <span class="dashboard-spatial-gradient dashboard-spatial-gradient--signal" aria-hidden="true"></span>
+                        <div class="dashboard-spatial-legend-ticks" aria-hidden="true">
+                            <span>−4</span><span>−2</span><span>0</span><span>+2</span><span>+4</span>
+                        </div>
+                    </div>
+                    <p class="dashboard-spatial-legend-description">Temperature anomalies relative to the 1850–1900 mean (°C)</p>`;
                 return;
             }
 
             const availableRanks = frame.rankings.filter(value => Number.isFinite(value) && value >= 1);
             const maximumRank = availableRanks.length ? Math.max(...availableRanks) : 1;
             legend.innerHTML = `
-                <span class="dashboard-spatial-legend-label">Warmth rank</span>
-                <span class="dashboard-spatial-gradient dashboard-spatial-gradient--rank" aria-hidden="true"></span>
-                <span class="dashboard-spatial-legend-range">1st (warmest)</span>
-                <span class="dashboard-spatial-legend-range">${ordinal(Math.round(maximumRank))}</span>`;
+                <div class="dashboard-spatial-legend-scale">
+                    <span class="dashboard-spatial-gradient dashboard-spatial-gradient--rank" aria-hidden="true"></span>
+                    <div class="dashboard-spatial-legend-ticks" aria-hidden="true">
+                        <span>1st</span><span>${ordinal(Math.round(maximumRank))}</span>
+                    </div>
+                </div>
+                <p class="dashboard-spatial-legend-description">Warmth rank within each grid-cell record</p>`;
         }
 
         function loadFrameFor(key, url) {
@@ -1572,6 +1667,18 @@
             return loadFrameFor(currentKey(), currentUrl());
         }
 
+        function loadBoundaryPaths() {
+            if (!boundaryPathsPromise) {
+                boundaryPathsPromise = fetchLiveText(WORLD_BOUNDARIES_URL)
+                    .then(parseWorldBoundaryPaths)
+                    .catch(error => {
+                        console.warn('Unable to load world boundaries for the spatial map:', error);
+                        return { coastlines: [], borders: [] };
+                    });
+            }
+            return boundaryPathsPromise;
+        }
+
         function preloadMonth(productKey, index) {
             if (index < 0) return Promise.resolve();
             return loadFrameFor(
@@ -1582,8 +1689,8 @@
             });
         }
 
-        function renderFrame(frame) {
-            drawSpatialMap(canvas, frame, metric);
+        function renderFrame(frame, boundaryPaths) {
+            drawSpatialMap(canvas, frame, metric, product, boundaryPaths);
             updateControls(frame);
             updateLegend(frame);
             canvas.setAttribute('aria-label', `${product === 'dcentI' ? 'DCENT-I' : 'DCENT'} ${metric === 'signal' ? 'warming signal' : 'warmth ranking'} map for ${spatialPeriodLabel(frame, timeMode)}`);
@@ -1601,9 +1708,9 @@
             status.classList.remove('error');
 
             try {
-                const frame = await loadFrame();
+                const [frame, boundaryPaths] = await Promise.all([loadFrame(), loadBoundaryPaths()]);
                 if (localRequestId !== requestId) return;
-                renderFrame(frame);
+                renderFrame(frame, boundaryPaths);
             } catch (error) {
                 if (localRequestId !== requestId) return;
                 status.textContent = 'The spatial map data could not be loaded. Please try again later.';
@@ -1650,9 +1757,12 @@
                 refresh();
             },
             preloadDefault() {
-                return loadFrameFor('dcentI:annual:latest', SPATIAL_MAP_URLS.dcentI.annual)
-                    .then(frame => {
-                        if (!started) renderFrame(frame);
+                return Promise.all([
+                    loadFrameFor('dcentI:annual:latest', SPATIAL_MAP_URLS.dcentI.annual),
+                    loadBoundaryPaths()
+                ])
+                    .then(([frame, boundaryPaths]) => {
+                        if (!started) renderFrame(frame, boundaryPaths);
                     })
                     .catch(error => {
                         console.warn('Unable to preload the default spatial map:', error);
