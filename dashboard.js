@@ -1475,6 +1475,11 @@
         return `${MONTH_LABELS[frame.month - 1]} ${frame.year}`;
     }
 
+    function normaliseCentralLongitude(longitude) {
+        const normalised = longitude % 360;
+        return normalised < 0 ? normalised + 360 : normalised;
+    }
+
     function parseWorldBoundaryPaths(text) {
         const topology = JSON.parse(text);
         const countries = topology.objects && topology.objects.countries;
@@ -1522,14 +1527,14 @@
         }, { coastlines: [], borders: [] });
     }
 
-    function robinsonRelativeLongitude(longitude) {
-        let relativeLongitude = longitude - 180;
+    function robinsonRelativeLongitude(longitude, centralLongitude = 180) {
+        let relativeLongitude = longitude - centralLongitude;
         while (relativeLongitude < -180) relativeLongitude += 360;
         while (relativeLongitude > 180) relativeLongitude -= 360;
-        return longitude === 360 ? 180 : relativeLongitude;
+        return relativeLongitude;
     }
 
-    function createRobinsonProjection(width, height) {
+    function createRobinsonProjection(width, height, centralLongitude = 180) {
         const xCoefficients = [1, 0.9986, 0.9954, 0.99, 0.9822, 0.973, 0.96, 0.9427, 0.9216, 0.8962, 0.8679, 0.835, 0.7986, 0.7597, 0.7186, 0.6732, 0.6213, 0.5722, 0.5322];
         const yCoefficients = [0, 0.062, 0.124, 0.186, 0.248, 0.31, 0.372, 0.434, 0.4958, 0.5571, 0.6176, 0.6769, 0.7346, 0.7903, 0.8435, 0.8936, 0.9394, 0.9761, 1];
         const xScale = 0.8487;
@@ -1549,7 +1554,7 @@
         };
 
         return (longitude, latitude) => {
-            const relativeLongitude = robinsonRelativeLongitude(longitude);
+            const relativeLongitude = robinsonRelativeLongitude(longitude, centralLongitude);
             const xCoefficient = interpolate(xCoefficients, latitude);
             const yCoefficient = interpolate(yCoefficients, latitude);
             return {
@@ -1559,13 +1564,16 @@
         };
     }
 
-    function drawProjectedBoundaryPath(context, coordinates, project) {
+    function drawProjectedBoundaryPath(context, coordinates, project, centralLongitude) {
         context.beginPath();
         let previousLongitude;
         coordinates.forEach(([longitude, latitude], index) => {
             const point = project(longitude, latitude);
             const crossesMapSeam = index > 0
-                && Math.abs(robinsonRelativeLongitude(longitude) - robinsonRelativeLongitude(previousLongitude)) > 180;
+                && Math.abs(
+                    robinsonRelativeLongitude(longitude, centralLongitude)
+                    - robinsonRelativeLongitude(previousLongitude, centralLongitude)
+                ) > 180;
             if (index === 0 || crossesMapSeam) context.moveTo(point.x, point.y);
             else context.lineTo(point.x, point.y);
             previousLongitude = longitude;
@@ -1573,12 +1581,14 @@
         context.stroke();
     }
 
-    function drawSpatialMap(canvas, frame, metric, product, boundaryPaths) {
+    function drawSpatialMap(canvas, frame, metric, product, boundaryPaths, centralLongitude = 180) {
         const context = canvas.getContext('2d');
         const width = canvas.width;
         const height = canvas.height;
-        const project = createRobinsonProjection(width, height);
+        const project = createRobinsonProjection(width, height, centralLongitude);
         const field = metric === 'signal' ? frame.values : frame.rankings;
+        const mapWest = centralLongitude - 180;
+        const mapEast = centralLongitude + 180;
 
         context.clearRect(0, 0, width, height);
         context.fillStyle = '#fff';
@@ -1600,15 +1610,21 @@
                     : metric === 'signal'
                         ? spatialSignalColor(value)
                         : spatialRankColor(value);
-                const corners = [[west, south], [east, south], [east, north], [west, north]];
-                context.beginPath();
-                corners.forEach(([longitude, latitude], index) => {
-                    const point = project(longitude, latitude);
-                    if (index === 0) context.moveTo(point.x, point.y);
-                    else context.lineTo(point.x, point.y);
-                });
-                context.closePath();
-                context.fill();
+                for (let worldOffset = -360; worldOffset <= 360; worldOffset += 360) {
+                    const segmentWest = Math.max(mapWest, west + worldOffset);
+                    const segmentEast = Math.min(mapEast, east + worldOffset);
+                    if (segmentEast <= segmentWest) continue;
+
+                    const corners = [[segmentWest, south], [segmentEast, south], [segmentEast, north], [segmentWest, north]];
+                    context.beginPath();
+                    corners.forEach(([longitude, latitude], index) => {
+                        const point = project(longitude, latitude);
+                        if (index === 0) context.moveTo(point.x, point.y);
+                        else context.lineTo(point.x, point.y);
+                    });
+                    context.closePath();
+                    context.fill();
+                }
             }
         }
 
@@ -1617,10 +1633,10 @@
         context.lineCap = 'round';
         context.strokeStyle = 'rgba(20, 26, 36, 0.95)';
         context.lineWidth = 1.65;
-        boundaryPaths.coastlines.forEach(path => drawProjectedBoundaryPath(context, path, project));
+        boundaryPaths.coastlines.forEach(path => drawProjectedBoundaryPath(context, path, project, centralLongitude));
         context.strokeStyle = 'rgba(20, 26, 36, 0.8)';
         context.lineWidth = 0.72;
-        boundaryPaths.borders.forEach(path => drawProjectedBoundaryPath(context, path, project));
+        boundaryPaths.borders.forEach(path => drawProjectedBoundaryPath(context, path, project, centralLongitude));
         context.restore();
     }
 
@@ -1643,9 +1659,19 @@
         let monthIndex = Number.isInteger(initialState.monthIndex)
             ? Math.max(0, Math.min(SPATIAL_MAP_URLS[product].months.length - 1, initialState.monthIndex))
             : SPATIAL_MAP_URLS[product].months.length - 1;
+        let centralLongitude = Number.isFinite(initialState.centralLongitude)
+            ? normaliseCentralLongitude(initialState.centralLongitude)
+            : 180;
         let started = false;
         let hasRenderedFrame = false;
         let requestId = 0;
+        let displayedFrame;
+        let displayedBoundaryPaths;
+        let dragPointerId;
+        let dragStartX;
+        let dragStartLongitude;
+        let hasDragged = false;
+        let redrawFrame;
 
         function currentUrl() {
             return timeMode === 'annual'
@@ -1658,7 +1684,20 @@
         }
 
         function saveState() {
-            onStateChange?.({ timeMode, product, metric, monthIndex });
+            onStateChange?.({ timeMode, product, metric, monthIndex, centralLongitude });
+        }
+
+        function redrawMap() {
+            if (!displayedFrame || !displayedBoundaryPaths) return;
+            drawSpatialMap(canvas, displayedFrame, metric, product, displayedBoundaryPaths, centralLongitude);
+        }
+
+        function scheduleMapRedraw() {
+            if (redrawFrame) return;
+            redrawFrame = requestAnimationFrame(() => {
+                redrawFrame = undefined;
+                redrawMap();
+            });
         }
 
         function setButtonState(buttons, selectedValue, datasetKey) {
@@ -1761,10 +1800,12 @@
         }
 
         function renderFrame(frame, boundaryPaths) {
-            drawSpatialMap(canvas, frame, metric, product, boundaryPaths);
+            displayedFrame = frame;
+            displayedBoundaryPaths = boundaryPaths;
+            redrawMap();
             updateControls(frame);
             updateLegend(frame);
-            canvas.setAttribute('aria-label', `${product === 'dcentI' ? 'DCENT-I' : 'DCENT'} ${metric === 'signal' ? 'warming signal' : 'temperature ranking'} map for ${spatialPeriodLabel(frame, timeMode)}`);
+            canvas.setAttribute('aria-label', `${product === 'dcentI' ? 'DCENT-I' : 'DCENT'} ${metric === 'signal' ? 'warming signal' : 'temperature ranking'} map for ${spatialPeriodLabel(frame, timeMode)}. Drag left or right to rotate the map.`);
             status.hidden = true;
             hasRenderedFrame = true;
             if (timeMode === 'monthly') preloadMonth(product, monthIndex - 1);
@@ -1824,6 +1865,35 @@
             saveState();
             refresh();
         });
+
+        canvas.addEventListener('pointerdown', event => {
+            if (event.button !== 0) return;
+            dragPointerId = event.pointerId;
+            dragStartX = event.clientX;
+            dragStartLongitude = centralLongitude;
+            hasDragged = false;
+            canvas.setPointerCapture(event.pointerId);
+            canvas.classList.add('is-dragging');
+            event.preventDefault();
+        });
+        canvas.addEventListener('pointermove', event => {
+            if (event.pointerId !== dragPointerId) return;
+            const canvasWidth = canvas.getBoundingClientRect().width;
+            if (!canvasWidth) return;
+            const longitudeShift = ((event.clientX - dragStartX) / canvasWidth) * 360;
+            if (Math.abs(longitudeShift) > 0.5) hasDragged = true;
+            centralLongitude = normaliseCentralLongitude(dragStartLongitude - longitudeShift);
+            scheduleMapRedraw();
+        });
+        const endMapDrag = event => {
+            if (event.pointerId !== dragPointerId) return;
+            dragPointerId = undefined;
+            canvas.classList.remove('is-dragging');
+            if (hasDragged) saveState();
+        };
+        canvas.addEventListener('pointerup', endMapDrag);
+        canvas.addEventListener('pointercancel', endMapDrag);
+        canvas.addEventListener('lostpointercapture', endMapDrag);
 
         updateControls();
         return {
