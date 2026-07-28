@@ -23,6 +23,7 @@
     const VERTICAL_HIT_TOLERANCE_PX = 19;
     const SVG_NS = 'http://www.w3.org/2000/svg';
     const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const SPATIAL_MAP_GRID = { longitudes: 72, latitudes: 36 };
     const DCENT_MISSING_CELL_COLOR = '#d7d7d7';
     const SPATIAL_SIGNAL_COLOR_BANDS = [
@@ -458,13 +459,30 @@
     }
 
     function rankingSubtitle(ranking) {
+        const punctuation = ranking.rank <= 3 ? '!' : '.';
         if (ranking.year === new Date().getFullYear()) {
             const emphasis = ranking.rank === 1 ? ' by far' : '';
             const rankText = ranking.rank === 1 ? 'warmest' : `${ordinal(ranking.rank)} warmest`;
-            return `${ranking.year} is${emphasis} the ${rankText} year in the ${ranking.label} record!`;
+            return `${ranking.year} is${emphasis} the ${rankText} year in ${ranking.label}${punctuation}`;
         }
 
-        return `${ranking.year} ranked as the ${ordinal(ranking.rank)} warmest year in the ${ranking.label} record!`;
+        return `${ranking.year} ranked as the ${ordinal(ranking.rank)} warmest year in ${ranking.label}${punctuation}`;
+    }
+
+    function latestMonthlyRanking(dataset) {
+        const latest = dataset.records[dataset.records.length - 1];
+        let monthIndex = latest.months.length - 1;
+        while (monthIndex >= 0 && !Number.isFinite(latest.months[monthIndex])) monthIndex -= 1;
+        if (monthIndex < 0) throw new Error(`The ${dataset.label} monthly record has no latest-month value.`);
+        const value = latest.months[monthIndex];
+        const rank = 1 + dataset.records.filter(record => record.months[monthIndex] > value).length;
+        return { year: latest.year, monthIndex, rank, label: dataset.label };
+    }
+
+    function monthlyRankingSubtitle(ranking) {
+        const month = MONTH_NAMES[ranking.monthIndex];
+        const punctuation = ranking.rank <= 3 ? '!' : '.';
+        return `${month} ${ranking.year} ranked as the <span class="dashboard-panel-rank">${ordinal(ranking.rank)}</span> warmest ${month} in ${ranking.label}${punctuation}`;
     }
 
     function renderChart(host, series, onSeriesFocus) {
@@ -1872,7 +1890,7 @@
                             <div class="dashboard-panel-heading">
                                 <div>
                                     <h2 id="monthly-panel-heading">Monthly Global Mean Surface Temperature Anomalies (GMST)</h2>
-                                    <p class="dashboard-panel-subtitle" aria-hidden="true">&nbsp;</p>
+                                    <p class="dashboard-panel-subtitle" data-monthly-subtitle></p>
                                 </div>
                             </div>
                             <figure class="dashboard-figure">
@@ -1950,16 +1968,20 @@
 
         const chartHost = content.querySelector('.dashboard-chart:not(.dashboard-monthly-chart)');
         const monthlyChartHost = content.querySelector('.dashboard-monthly-chart');
+        const monthlySubtitle = content.querySelector('[data-monthly-subtitle]');
         const stripeChartHost = content.querySelector('.dashboard-stripe-chart');
         const spatialMap = initialiseSpatialMap(content.querySelector('.dashboard-spatial-map'));
         const monthlyProductButtons = [...content.querySelectorAll('[data-monthly-product]')];
         let annualCommonOffset;
         let monthlyRawDatasets;
+        let monthlyDatasets;
         let monthlyChart;
 
         function setMonthlyProduct(key) {
             if (!monthlyChart) return;
             monthlyChart.selectDataset(key);
+            const dataset = monthlyDatasets.find(candidate => candidate.key === key);
+            monthlySubtitle.innerHTML = monthlyRankingSubtitle(latestMonthlyRanking(dataset));
             monthlyProductButtons.forEach(button => {
                 const isActive = button.dataset.monthlyProduct === key;
                 button.classList.toggle('is-active', isActive);
@@ -1970,9 +1992,10 @@
         function renderMonthlyWhenReady() {
             if (!monthlyRawDatasets || !Number.isFinite(annualCommonOffset)) return;
             monthlyChartHost.removeAttribute('role');
+            monthlyDatasets = alignMonthlyToAnnualReference(monthlyRawDatasets, annualCommonOffset);
             monthlyChart = renderMonthlyChart(
                 monthlyChartHost,
-                alignMonthlyToAnnualReference(monthlyRawDatasets, annualCommonOffset)
+                monthlyDatasets
             );
             setMonthlyProduct('dcentI');
         }

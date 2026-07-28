@@ -25,9 +25,9 @@ p {
   hyphens: auto;             /* 标准写法：自动连字符断词 */
 }
 
-.layout{display:grid;grid-template-columns:var(--navw) 1fr;min-height:100vh;width:100%;max-width:var(--content-max);background:#fff}
+.layout{display:grid;grid-template-columns:var(--navw) minmax(0,1fr);min-height:100vh;width:100%;max-width:var(--content-max);background:#fff}
 nav.sidenav{position:sticky;top:0;height:100vh;width:var(--navw);border-right:3px solid var(--b100);background:#fff;overflow:auto;z-index:1000;transition:transform .25s ease}
-main{transition:transform .25s ease}
+main{min-width:0;transition:transform .25s ease}
 
 a {color: #4f6daf; font-weight: bold;}
 a:hover {color: #171d5c;}
@@ -43,6 +43,8 @@ b, strong {font-family: 'Calibri', sans-serif; font-weight: 600;  color: #5573b3
 .panel{min-height:auto;padding:2rem 0.2rem; border-bottom:3px solid var(--b100);display:block}
 #home.panel{display:flex;align-items:flex-start;justify-content:center;min-height:auto;padding-top:2rem;padding-bottom:2rem}
 .container{width:100%;max-width:calc(var(--content-max) - var(--navw));padding:0 1rem;margin-inline:0}
+.tool-embed{--tool-width:130%;width:100%;overflow-x:hidden}
+.tool-embed iframe{display:block;width:var(--tool-width);max-width:none;height:960px;border:0}
 
 /* Dashboard: intentionally a clean white canvas until its data modules are defined. */
 #dashboard{background:#fff}
