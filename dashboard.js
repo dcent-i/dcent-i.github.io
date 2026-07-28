@@ -26,22 +26,38 @@
     const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const SPATIAL_MAP_GRID = { longitudes: 72, latitudes: 36 };
+    // Set to true to re-enable the experimental vertical globe rotation.
+    const ENABLE_VERTICAL_MAP_ROTATION = false;
+    const SPATIAL_COASTLINE_WIDTH = 1.65;
+    const SPATIAL_COUNTRY_BORDER_WIDTH = 0.72;
+    const SPATIAL_MAP_OUTLINE_WIDTH = 1.05;
+    const SPATIAL_SIGNAL_RANGE = 5;
+    const ROBINSON_X_COEFFICIENTS = [1, 0.9986, 0.9954, 0.99, 0.9822, 0.973, 0.96, 0.9427, 0.9216, 0.8962, 0.8679, 0.835, 0.7986, 0.7597, 0.7186, 0.6732, 0.6213, 0.5722, 0.5322];
+    const ROBINSON_Y_COEFFICIENTS = [0, 0.062, 0.124, 0.186, 0.248, 0.31, 0.372, 0.434, 0.4958, 0.5571, 0.6176, 0.6769, 0.7346, 0.7903, 0.8435, 0.8936, 0.9394, 0.9761, 1];
+    const ROBINSON_X_SCALE = 0.8487;
+    const ROBINSON_Y_SCALE = 1.3523;
     const DCENT_MISSING_CELL_COLOR = '#d7d7d7';
-    const SPATIAL_COLD_RANK_COLORS = [[44, 19, 157], [34, 96, 214], [103, 166, 220], [161, 220, 227]];
-    const SPATIAL_WARM_RANK_COLORS = [[134, 20, 21], [203, 82, 95], [239, 168, 126], [249, 231, 178]];
+    const SPATIAL_COLD_RANK_COLORS = ['#361da9', '#3069d3', '#79aedd', '#b2dfe4'];
+    const SPATIAL_WARM_RANK_COLORS = ['#b41f1fe7', '#df6c78', '#eeb18e', '#f9e7b2'];
     const SPATIAL_SIGNAL_WARM_COLOR_BANDS = [
-        [255, 251, 239], [249, 231, 178], [244, 200, 152], [239, 168, 126],
-        [227, 139, 116], [215, 111, 105], [203, 82, 95], [180, 61, 70],
-        [157, 41, 46], [134, 20, 21], [104, 20, 21], [74, 20, 21]
+        '#fffbef', '#f9e7b2', '#f4c898', '#efa87e',
+        '#e38b74', '#d76f69', '#cb525f', '#b43d46',
+        '#9d292e', '#861415', '#681415', 
     ];
     const SPATIAL_SIGNAL_COLOR_BANDS = [
-        [47, 20, 160], [35, 29, 184], [27, 51, 199], [31, 78, 211], [47, 105, 218], [72, 136, 222],
-        [103, 166, 220], [137, 194, 222], [169, 219, 224], [198, 235, 231], [225, 244, 237], [246, 248, 238],
+        '#231db8', '#1b33c7', '#1f4ed3', '#2f69da', '#4888de',
+        '#67a6dc', '#89c2de', '#a9dbe0', '#c6ebe7', '#e1f4ed', '#f6f8ee',
         ...SPATIAL_SIGNAL_WARM_COLOR_BANDS
     ];
     const SPATIAL_MAP_URLS = {
         dcentI: {
-            annual: 'https://dl.dropboxusercontent.com/scl/fi/soac74wlws2oop62glahg/DCENT-I_latest_year.txt?rlkey=mlpctb79rlbkuenihpu8v6wgv&dl=0',
+            annuals: [
+                'https://dl.dropboxusercontent.com/scl/fi/swrsm3rimy0ftj4eizs90/DCENT-I_latest_year_minus_4.txt?rlkey=6iejeb7cx0hvfhubj62jfw59p&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/2n742sipk6q3cyeu8srru/DCENT-I_latest_year_minus_3.txt?rlkey=bol4pmjtqvigmere75pm3mnsq&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/51netjwgp21ewcv2k322e/DCENT-I_latest_year_minus_2.txt?rlkey=fs7ya4bi5j91rkpcxy6m2rg39&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/fijn3bb0gmgr7y2rq0npo/DCENT-I_latest_year_minus_1.txt?rlkey=s9uyj9czs8d9xclf0rzukftqd&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/soac74wlws2oop62glahg/DCENT-I_latest_year.txt?rlkey=mlpctb79rlbkuenihpu8v6wgv&dl=0'
+            ],
             months: [
                 'https://dl.dropboxusercontent.com/scl/fi/99te0fd5gzgrody2vabhd/DCENT-I_latest_month_minus_11.txt?rlkey=c2qvg4s3s72ls8a0q59u9k0p7&dl=0',
                 'https://dl.dropboxusercontent.com/scl/fi/qvzuqzn2d3yrpu8yrdgij/DCENT-I_latest_month_minus_10.txt?rlkey=u2cdn7r03qtxxj6qlr0pyo30f&dl=0',
@@ -58,7 +74,13 @@
             ]
         },
         dcent: {
-            annual: 'https://dl.dropboxusercontent.com/scl/fi/acf1aloz4jhyewty3wlt6/DCENT_latest_year.txt?rlkey=36a0p0bssrfacpofcj3fe8cj9&dl=0',
+            annuals: [
+                'https://dl.dropboxusercontent.com/scl/fi/ul2pmde9ebxlbesb5vslz/DCENT_latest_year_minus_4.txt?rlkey=m7h8tkdih41hi270xow9fp1vf&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/zm5g706loahr4fd1fhkby/DCENT_latest_year_minus_3.txt?rlkey=la24vlv3199r76wpc9temvj21&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/it3jw2z9u4eqou12dgyge/DCENT_latest_year_minus_2.txt?rlkey=c4hhfg3xl5azmvc47im3w0261&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/zwiyboeztzd212kne5zqj/DCENT_latest_year_minus_1.txt?rlkey=ksz8ekgv35kpgoi2vgdt9xug6&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/acf1aloz4jhyewty3wlt6/DCENT_latest_year.txt?rlkey=36a0p0bssrfacpofcj3fe8cj9&dl=0'
+            ],
             months: [
                 'https://dl.dropboxusercontent.com/scl/fi/1btiaxtsl2zsv5ylkjveo/DCENT_latest_month_minus_11.txt?rlkey=1vcs7cwqo20uhark1200l7l2w&dl=0',
                 'https://dl.dropboxusercontent.com/scl/fi/qs17ic343dpvutpxv4xxo/DCENT_latest_month_minus_10.txt?rlkey=yjx1g9qnijj5db1ovcaa81ae5&dl=0',
@@ -839,8 +861,8 @@
         return from.map((channel, index) => Math.round(channel + (to[index] - channel) * clampedAmount));
     }
 
-    function rgbColor(channels) {
-        return `rgb(${channels.join(' ')})`;
+    function rgbColor(color) {
+        return typeof color === 'string' ? color : `rgb(${color.join(' ')})`;
     }
 
     function darkenRgbColor(color, amount = 0.34) {
@@ -1450,14 +1472,27 @@
         };
     }
 
-    function spatialSignalColor(value) {
-        const normalizedValue = Math.max(0, Math.min(0.999999, (value + 4) / 8));
-        return rgbColor(SPATIAL_SIGNAL_COLOR_BANDS[Math.floor(normalizedValue * SPATIAL_SIGNAL_COLOR_BANDS.length)]);
+    function spatialSignalColorBandIndex(value) {
+        const bandsPerSide = (SPATIAL_SIGNAL_COLOR_BANDS.length - 2) / 2;
+        const bandWidth = SPATIAL_SIGNAL_RANGE / bandsPerSide;
+        const warmStartIndex = bandsPerSide + 1;
+
+        if (value < -SPATIAL_SIGNAL_RANGE) return 0;
+        if (value > SPATIAL_SIGNAL_RANGE) return SPATIAL_SIGNAL_COLOR_BANDS.length - 1;
+        if (value < 0) {
+            return 1 + Math.min(bandsPerSide - 1, Math.floor((value + SPATIAL_SIGNAL_RANGE) / bandWidth));
+        }
+
+        return warmStartIndex + Math.min(bandsPerSide - 1, Math.floor(value / bandWidth));
     }
 
-    function spatialSignalLegendGradient() {
-        const bandWidth = 100 / SPATIAL_SIGNAL_COLOR_BANDS.length;
-        const stops = SPATIAL_SIGNAL_COLOR_BANDS.map((color, index) => {
+    function spatialSignalColor(value) {
+        return rgbColor(SPATIAL_SIGNAL_COLOR_BANDS[spatialSignalColorBandIndex(value)]);
+    }
+
+    function spatialSignalLegendGradient(colorBands) {
+        const bandWidth = 100 / colorBands.length;
+        const stops = colorBands.map((color, index) => {
             const start = (index * bandWidth).toFixed(4);
             const end = ((index + 1) * bandWidth).toFixed(4);
             return `${rgbColor(color)} ${start}% ${end}%`;
@@ -1468,6 +1503,29 @@
     function spatialRankColor(rank) {
         const colorIndex = Math.min(3, Math.max(0, Math.abs(Math.round(rank)) - 1));
         return rgbColor((rank < 0 ? SPATIAL_COLD_RANK_COLORS : SPATIAL_WARM_RANK_COLORS)[colorIndex]);
+    }
+
+    function spatialCellFillColor(frame, cellIndex, metric, product) {
+        const temperature = frame.values[cellIndex];
+        if (!Number.isFinite(temperature)) {
+            return product === 'dcent' ? DCENT_MISSING_CELL_COLOR : undefined;
+        }
+        if (metric === 'signal') return spatialSignalColor(temperature);
+
+        const rank = frame.rankings[cellIndex];
+        if (!Number.isFinite(rank) || rank === 0 || Math.abs(rank) > 5) return undefined;
+        return spatialRankColor(rank);
+    }
+
+    function spatialCellLegendBand(frame, cellIndex, metric) {
+        const temperature = frame.values[cellIndex];
+        if (!Number.isFinite(temperature)) return undefined;
+        if (metric === 'signal') return `signal-${spatialSignalColorBandIndex(temperature)}`;
+
+        const rank = frame.rankings[cellIndex];
+        if (!Number.isFinite(rank) || rank === 0 || Math.abs(rank) > 5) return undefined;
+        const rankIndex = Math.min(3, Math.max(0, Math.abs(Math.round(rank)) - 1));
+        return `rank-${rank < 0 ? 'cold' : 'warm'}-${rankIndex}`;
     }
 
     function spatialPeriodLabel(frame, mode) {
@@ -1527,66 +1585,166 @@
         }, { coastlines: [], borders: [] });
     }
 
-    function robinsonRelativeLongitude(longitude, centralLongitude = 180) {
-        let relativeLongitude = longitude - centralLongitude;
-        while (relativeLongitude < -180) relativeLongitude += 360;
-        while (relativeLongitude > 180) relativeLongitude -= 360;
-        return relativeLongitude;
+    function unwrapLongitude(longitude, referenceLongitude) {
+        let unwrappedLongitude = longitude;
+        while (unwrappedLongitude - referenceLongitude < -180) unwrappedLongitude += 360;
+        while (unwrappedLongitude - referenceLongitude > 180) unwrappedLongitude -= 360;
+        return unwrappedLongitude;
     }
 
-    function createRobinsonProjection(width, height, centralLongitude = 180) {
-        const xCoefficients = [1, 0.9986, 0.9954, 0.99, 0.9822, 0.973, 0.96, 0.9427, 0.9216, 0.8962, 0.8679, 0.835, 0.7986, 0.7597, 0.7186, 0.6732, 0.6213, 0.5722, 0.5322];
-        const yCoefficients = [0, 0.062, 0.124, 0.186, 0.248, 0.31, 0.372, 0.434, 0.4958, 0.5571, 0.6176, 0.6769, 0.7346, 0.7903, 0.8435, 0.8936, 0.9394, 0.9761, 1];
-        const xScale = 0.8487;
-        const yScale = 1.3523;
-        const scale = Math.min(
-            (width - 48) / (2 * xScale * Math.PI),
-            (height - 44) / (2 * yScale)
-        );
-        const centreX = width / 2;
-        const centreY = height / 2;
+    function relativeLongitude(longitude, centralLongitude) {
+        let relative = longitude - centralLongitude;
+        while (relative < -180) relative += 360;
+        while (relative > 180) relative -= 360;
+        return relative;
+    }
 
-        const interpolate = (coefficients, latitude) => {
-            const position = Math.min(90, Math.abs(latitude)) / 5;
-            const lowerIndex = Math.floor(position);
-            const upperIndex = Math.min(coefficients.length - 1, lowerIndex + 1);
-            return coefficients[lowerIndex] + (coefficients[upperIndex] - coefficients[lowerIndex]) * (position - lowerIndex);
-        };
+    function createSphericalRotation(centralLongitude, centralLatitude) {
+        const longitudeOffset = centralLongitude * Math.PI / 180;
+        const latitudeOffset = centralLatitude * Math.PI / 180;
+        const cosineLatitudeOffset = Math.cos(latitudeOffset);
+        const sineLatitudeOffset = Math.sin(latitudeOffset);
 
         return (longitude, latitude) => {
-            const relativeLongitude = robinsonRelativeLongitude(longitude, centralLongitude);
-            const xCoefficient = interpolate(xCoefficients, latitude);
-            const yCoefficient = interpolate(yCoefficients, latitude);
+            const longitudeRadians = longitude * Math.PI / 180 - longitudeOffset;
+            const latitudeRadians = latitude * Math.PI / 180;
+            const cosineLatitude = Math.cos(latitudeRadians);
+            const x = cosineLatitude * Math.cos(longitudeRadians);
+            const y = cosineLatitude * Math.sin(longitudeRadians);
+            const z = Math.sin(latitudeRadians);
+            const rotatedX = cosineLatitudeOffset * x + sineLatitudeOffset * z;
+            const rotatedZ = -sineLatitudeOffset * x + cosineLatitudeOffset * z;
+
             return {
-                x: centreX + xScale * scale * (relativeLongitude * Math.PI / 180) * xCoefficient,
-                y: centreY - Math.sign(latitude) * yScale * scale * yCoefficient
+                longitude: Math.atan2(y, rotatedX) * 180 / Math.PI,
+                latitude: Math.asin(Math.max(-1, Math.min(1, rotatedZ))) * 180 / Math.PI
             };
         };
     }
 
-    function drawProjectedBoundaryPath(context, coordinates, project, centralLongitude) {
+    function getRobinsonProjectionMetrics(width, height) {
+        return {
+            scale: Math.min(
+                (width - 48) / (2 * ROBINSON_X_SCALE * Math.PI),
+                (height - 44) / (2 * ROBINSON_Y_SCALE)
+            ),
+            centreX: width / 2,
+            centreY: height / 2
+        };
+    }
+
+    function interpolateRobinsonCoefficient(coefficients, latitude) {
+        const position = Math.min(90, Math.abs(latitude)) / 5;
+        const lowerIndex = Math.floor(position);
+        const upperIndex = Math.min(coefficients.length - 1, lowerIndex + 1);
+        return coefficients[lowerIndex] + (coefficients[upperIndex] - coefficients[lowerIndex]) * (position - lowerIndex);
+    }
+
+    function createRobinsonProjection(width, height) {
+        const { scale, centreX, centreY } = getRobinsonProjectionMetrics(width, height);
+        return (longitude, latitude) => {
+            const xCoefficient = interpolateRobinsonCoefficient(ROBINSON_X_COEFFICIENTS, latitude);
+            const yCoefficient = interpolateRobinsonCoefficient(ROBINSON_Y_COEFFICIENTS, latitude);
+            return {
+                x: centreX + ROBINSON_X_SCALE * scale * (longitude * Math.PI / 180) * xCoefficient,
+                y: centreY - Math.sign(latitude) * ROBINSON_Y_SCALE * scale * yCoefficient
+            };
+        };
+    }
+
+    function invertRobinsonProjection(x, y, width, height) {
+        const { scale, centreX, centreY } = getRobinsonProjectionMetrics(width, height);
+        const signedY = (centreY - y) / (ROBINSON_Y_SCALE * scale);
+        const absoluteY = Math.abs(signedY);
+        if (absoluteY > 1) return undefined;
+
+        let upperIndex = ROBINSON_Y_COEFFICIENTS.findIndex(coefficient => coefficient >= absoluteY);
+        if (upperIndex < 0) return undefined;
+        const lowerIndex = Math.max(0, upperIndex - 1);
+        const lowerCoefficient = ROBINSON_Y_COEFFICIENTS[lowerIndex];
+        const upperCoefficient = ROBINSON_Y_COEFFICIENTS[upperIndex];
+        const interpolation = upperCoefficient === lowerCoefficient
+            ? 0
+            : (absoluteY - lowerCoefficient) / (upperCoefficient - lowerCoefficient);
+        const latitude = Math.sign(signedY) * (lowerIndex + interpolation) * 5;
+        const xCoefficient = interpolateRobinsonCoefficient(ROBINSON_X_COEFFICIENTS, latitude);
+        const longitude = ((x - centreX) / (ROBINSON_X_SCALE * scale * xCoefficient)) * 180 / Math.PI;
+        if (Math.abs(longitude) > 180) return undefined;
+        return { longitude, latitude };
+    }
+
+    function traceRobinsonOutline(context, project) {
+        context.beginPath();
+        for (let latitude = -90; latitude <= 90; latitude += 2) {
+            const point = project(-180, latitude);
+            if (latitude === -90) context.moveTo(point.x, point.y);
+            else context.lineTo(point.x, point.y);
+        }
+        for (let longitude = -180; longitude <= 180; longitude += 2) {
+            const point = project(longitude, 90);
+            context.lineTo(point.x, point.y);
+        }
+        for (let latitude = 90; latitude >= -90; latitude -= 2) {
+            const point = project(180, latitude);
+            context.lineTo(point.x, point.y);
+        }
+        for (let longitude = 180; longitude >= -180; longitude -= 2) {
+            const point = project(longitude, -90);
+            context.lineTo(point.x, point.y);
+        }
+        context.closePath();
+    }
+
+    function clipToRobinsonOutline(context, project) {
+        traceRobinsonOutline(context, project);
+        context.clip();
+    }
+
+    function drawProjectedBoundaryPath(context, coordinates, project, rotate) {
+        let previousLongitude;
+        const points = coordinates.map(([longitude, latitude]) => {
+            const rotatedPoint = rotate(longitude, latitude);
+            const unwrappedLongitude = previousLongitude === undefined
+                ? rotatedPoint.longitude
+                : unwrapLongitude(rotatedPoint.longitude, previousLongitude);
+            previousLongitude = unwrappedLongitude;
+            return { longitude: unwrappedLongitude, latitude: rotatedPoint.latitude };
+        });
+        const longitudes = points.map(point => point.longitude);
+        const minimumLongitude = Math.min(...longitudes);
+        const maximumLongitude = Math.max(...longitudes);
+
+        for (let worldOffset = -360; worldOffset <= 360; worldOffset += 360) {
+            if (maximumLongitude + worldOffset < -180 || minimumLongitude + worldOffset > 180) continue;
+            context.beginPath();
+            points.forEach((point, index) => {
+                const projectedPoint = project(point.longitude + worldOffset, point.latitude);
+                if (index === 0) context.moveTo(projectedPoint.x, projectedPoint.y);
+                else context.lineTo(projectedPoint.x, projectedPoint.y);
+            });
+            context.stroke();
+        }
+    }
+
+    function drawHorizontalBoundaryPath(context, coordinates, project, centralLongitude) {
         context.beginPath();
         let previousLongitude;
         coordinates.forEach(([longitude, latitude], index) => {
-            const point = project(longitude, latitude);
-            const crossesMapSeam = index > 0
-                && Math.abs(
-                    robinsonRelativeLongitude(longitude, centralLongitude)
-                    - robinsonRelativeLongitude(previousLongitude, centralLongitude)
-                ) > 180;
+            const longitudeOnMap = relativeLongitude(longitude, centralLongitude);
+            const point = project(longitudeOnMap, latitude);
+            const crossesMapSeam = index > 0 && Math.abs(longitudeOnMap - previousLongitude) > 180;
             if (index === 0 || crossesMapSeam) context.moveTo(point.x, point.y);
             else context.lineTo(point.x, point.y);
-            previousLongitude = longitude;
+            previousLongitude = longitudeOnMap;
         });
         context.stroke();
     }
 
-    function drawSpatialMap(canvas, frame, metric, product, boundaryPaths, centralLongitude = 180) {
+    function drawHorizontalSpatialMap(canvas, frame, metric, product, boundaryPaths, centralLongitude) {
         const context = canvas.getContext('2d');
         const width = canvas.width;
         const height = canvas.height;
-        const project = createRobinsonProjection(width, height, centralLongitude);
-        const field = metric === 'signal' ? frame.values : frame.rankings;
+        const project = createRobinsonProjection(width, height);
         const mapWest = centralLongitude - 180;
         const mapEast = centralLongitude + 180;
 
@@ -1596,20 +1754,14 @@
 
         for (let longitudeIndex = 0; longitudeIndex < SPATIAL_MAP_GRID.longitudes; longitudeIndex += 1) {
             for (let latitudeIndex = 0; latitudeIndex < SPATIAL_MAP_GRID.latitudes; latitudeIndex += 1) {
-                const value = field[longitudeIndex * SPATIAL_MAP_GRID.latitudes + latitudeIndex];
+                const cellIndex = longitudeIndex * SPATIAL_MAP_GRID.latitudes + latitudeIndex;
+                const fillColor = spatialCellFillColor(frame, cellIndex, metric, product);
                 const west = longitudeIndex * 5;
                 const east = west + 5;
                 const south = -90 + latitudeIndex * 5;
                 const north = south + 5;
-                const isMissing = !Number.isFinite(value);
-                const isOutsideRankTopFive = metric === 'rank' && !isMissing && (value === 0 || Math.abs(value) > 5);
-                if (isOutsideRankTopFive) continue;
-                if (isMissing && product !== 'dcent') continue;
-                context.fillStyle = isMissing
-                    ? DCENT_MISSING_CELL_COLOR
-                    : metric === 'signal'
-                        ? spatialSignalColor(value)
-                        : spatialRankColor(value);
+                if (!fillColor) continue;
+                context.fillStyle = fillColor;
                 for (let worldOffset = -360; worldOffset <= 360; worldOffset += 360) {
                     const segmentWest = Math.max(mapWest, west + worldOffset);
                     const segmentEast = Math.min(mapEast, east + worldOffset);
@@ -1618,7 +1770,7 @@
                     const corners = [[segmentWest, south], [segmentEast, south], [segmentEast, north], [segmentWest, north]];
                     context.beginPath();
                     corners.forEach(([longitude, latitude], index) => {
-                        const point = project(longitude, latitude);
+                        const point = project(longitude - centralLongitude, latitude);
                         if (index === 0) context.moveTo(point.x, point.y);
                         else context.lineTo(point.x, point.y);
                     });
@@ -1632,16 +1784,142 @@
         context.lineJoin = 'round';
         context.lineCap = 'round';
         context.strokeStyle = 'rgba(20, 26, 36, 0.95)';
-        context.lineWidth = 1.65;
-        boundaryPaths.coastlines.forEach(path => drawProjectedBoundaryPath(context, path, project, centralLongitude));
+        context.lineWidth = SPATIAL_COASTLINE_WIDTH;
+        boundaryPaths.coastlines.forEach(path => drawHorizontalBoundaryPath(context, path, project, centralLongitude));
         context.strokeStyle = 'rgba(20, 26, 36, 0.8)';
-        context.lineWidth = 0.72;
-        boundaryPaths.borders.forEach(path => drawProjectedBoundaryPath(context, path, project, centralLongitude));
+        context.lineWidth = SPATIAL_COUNTRY_BORDER_WIDTH;
+        boundaryPaths.borders.forEach(path => drawHorizontalBoundaryPath(context, path, project, centralLongitude));
+        context.strokeStyle = 'rgba(20, 26, 36, 0.9)';
+        context.lineWidth = SPATIAL_MAP_OUTLINE_WIDTH;
+        traceRobinsonOutline(context, project);
+        context.stroke();
+        context.restore();
+    }
+
+    function spatialCellIndexAtPoint(x, y, width, height, centralLongitude) {
+        const projectedPoint = invertRobinsonProjection(x, y, width, height);
+        if (!projectedPoint) return undefined;
+        const longitude = normaliseCentralLongitude(centralLongitude + projectedPoint.longitude);
+        const longitudeIndex = Math.min(SPATIAL_MAP_GRID.longitudes - 1, Math.floor(longitude / 5));
+        const latitudeIndex = Math.min(
+            SPATIAL_MAP_GRID.latitudes - 1,
+            Math.max(0, Math.floor((projectedPoint.latitude + 90) / 5))
+        );
+        return longitudeIndex * SPATIAL_MAP_GRID.latitudes + latitudeIndex;
+    }
+
+    function drawSpatialCellHover(context, canvas, cellIndex, centralLongitude) {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        const longitudeIndex = Math.floor(cellIndex / SPATIAL_MAP_GRID.latitudes);
+        const latitudeIndex = cellIndex % SPATIAL_MAP_GRID.latitudes;
+        const west = longitudeIndex * 5;
+        const east = west + 5;
+        const south = -90 + latitudeIndex * 5;
+        const north = south + 5;
+        const mapWest = centralLongitude - 180;
+        const mapEast = centralLongitude + 180;
+        const project = createRobinsonProjection(canvas.width, canvas.height);
+
+        context.save();
+        context.fillStyle = 'rgba(255, 255, 255, 0.24)';
+        context.strokeStyle = 'rgba(20, 26, 36, 0.92)';
+        context.lineWidth = 1.5;
+        for (let worldOffset = -360; worldOffset <= 360; worldOffset += 360) {
+            const segmentWest = Math.max(mapWest, west + worldOffset);
+            const segmentEast = Math.min(mapEast, east + worldOffset);
+            if (segmentEast <= segmentWest) continue;
+
+            const corners = [[segmentWest, south], [segmentEast, south], [segmentEast, north], [segmentWest, north]];
+            context.beginPath();
+            corners.forEach(([longitude, latitude], index) => {
+                const point = project(longitude - centralLongitude, latitude);
+                if (index === 0) context.moveTo(point.x, point.y);
+                else context.lineTo(point.x, point.y);
+            });
+            context.closePath();
+            context.fill();
+            context.stroke();
+        }
+        context.restore();
+    }
+
+    function drawSpatialMap(canvas, frame, metric, product, boundaryPaths, centralLongitude = 180, centralLatitude = 0) {
+        if (!ENABLE_VERTICAL_MAP_ROTATION) {
+            drawHorizontalSpatialMap(canvas, frame, metric, product, boundaryPaths, centralLongitude);
+            return;
+        }
+
+        const context = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        const project = createRobinsonProjection(width, height);
+        const rotate = createSphericalRotation(centralLongitude, centralLatitude);
+
+        context.clearRect(0, 0, width, height);
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, width, height);
+
+        context.save();
+        clipToRobinsonOutline(context, project);
+
+        for (let longitudeIndex = 0; longitudeIndex < SPATIAL_MAP_GRID.longitudes; longitudeIndex += 1) {
+            for (let latitudeIndex = 0; latitudeIndex < SPATIAL_MAP_GRID.latitudes; latitudeIndex += 1) {
+                const cellIndex = longitudeIndex * SPATIAL_MAP_GRID.latitudes + latitudeIndex;
+                const fillColor = spatialCellFillColor(frame, cellIndex, metric, product);
+                const west = longitudeIndex * 5;
+                const east = west + 5;
+                const south = -90 + latitudeIndex * 5;
+                const north = south + 5;
+                if (!fillColor) continue;
+                context.fillStyle = fillColor;
+                const corners = [[west, south], [east, south], [east, north], [west, north]];
+                let previousLongitude;
+                const rotatedCorners = corners.map(([longitude, latitude]) => {
+                    const rotatedPoint = rotate(longitude, latitude);
+                    const unwrappedLongitude = previousLongitude === undefined
+                        ? rotatedPoint.longitude
+                        : unwrapLongitude(rotatedPoint.longitude, previousLongitude);
+                    previousLongitude = unwrappedLongitude;
+                    return { longitude: unwrappedLongitude, latitude: rotatedPoint.latitude };
+                });
+                const longitudes = rotatedCorners.map(point => point.longitude);
+                const minimumLongitude = Math.min(...longitudes);
+                const maximumLongitude = Math.max(...longitudes);
+
+                for (let worldOffset = -360; worldOffset <= 360; worldOffset += 360) {
+                    if (maximumLongitude + worldOffset < -180 || minimumLongitude + worldOffset > 180) continue;
+                    context.beginPath();
+                    rotatedCorners.forEach((point, index) => {
+                        const projectedPoint = project(point.longitude + worldOffset, point.latitude);
+                        if (index === 0) context.moveTo(projectedPoint.x, projectedPoint.y);
+                        else context.lineTo(projectedPoint.x, projectedPoint.y);
+                    });
+                    context.closePath();
+                    context.fill();
+                }
+            }
+        }
+
+        context.save();
+        context.lineJoin = 'round';
+        context.lineCap = 'round';
+        context.strokeStyle = 'rgba(20, 26, 36, 0.95)';
+        context.lineWidth = SPATIAL_COASTLINE_WIDTH;
+        boundaryPaths.coastlines.forEach(path => drawProjectedBoundaryPath(context, path, project, rotate));
+        context.strokeStyle = 'rgba(20, 26, 36, 0.8)';
+        context.lineWidth = SPATIAL_COUNTRY_BORDER_WIDTH;
+        boundaryPaths.borders.forEach(path => drawProjectedBoundaryPath(context, path, project, rotate));
+        context.strokeStyle = 'rgba(20, 26, 36, 0.9)';
+        context.lineWidth = SPATIAL_MAP_OUTLINE_WIDTH;
+        traceRobinsonOutline(context, project);
+        context.stroke();
         context.restore();
     }
 
     function initialiseSpatialMap(host, initialState = {}, onStateChange) {
         const canvas = host.querySelector('.dashboard-spatial-map-canvas');
+        const hoverCanvas = host.querySelector('.dashboard-spatial-map-hover-canvas');
+        const hoverContext = hoverCanvas.getContext('2d');
         const renderCanvas = typeof OffscreenCanvas === 'function'
             ? new OffscreenCanvas(canvas.width, canvas.height)
             : document.createElement('canvas');
@@ -1663,12 +1941,18 @@
         let timeMode = initialState.timeMode === 'monthly' ? 'monthly' : 'annual';
         let product = initialState.product === 'dcent' ? 'dcent' : 'dcentI';
         let metric = initialState.metric === 'rank' ? 'rank' : 'signal';
+        let annualIndex = Number.isInteger(initialState.annualIndex)
+            ? Math.max(0, Math.min(SPATIAL_MAP_URLS[product].annuals.length - 1, initialState.annualIndex))
+            : SPATIAL_MAP_URLS[product].annuals.length - 1;
         let monthIndex = Number.isInteger(initialState.monthIndex)
             ? Math.max(0, Math.min(SPATIAL_MAP_URLS[product].months.length - 1, initialState.monthIndex))
             : SPATIAL_MAP_URLS[product].months.length - 1;
         let centralLongitude = Number.isFinite(initialState.centralLongitude)
             ? normaliseCentralLongitude(initialState.centralLongitude)
             : 180;
+        let centralLatitude = ENABLE_VERTICAL_MAP_ROTATION && Number.isFinite(initialState.centralLatitude)
+            ? Math.max(-65, Math.min(65, initialState.centralLatitude))
+            : 0;
         let started = false;
         let hasRenderedFrame = false;
         let requestId = 0;
@@ -1676,27 +1960,31 @@
         let displayedBoundaryPaths;
         let dragPointerId;
         let dragStartX;
+        let dragStartY;
         let dragStartLongitude;
+        let dragStartLatitude;
         let hasDragged = false;
         let redrawFrame;
+        let hoveredCellIndex;
+        let highlightedLegendBand;
 
         function currentUrl() {
             return timeMode === 'annual'
-                ? SPATIAL_MAP_URLS[product].annual
+                ? SPATIAL_MAP_URLS[product].annuals[annualIndex]
                 : SPATIAL_MAP_URLS[product].months[monthIndex];
         }
 
         function currentKey() {
-            return `${product}:${timeMode}:${timeMode === 'annual' ? 'latest' : monthIndex}`;
+            return `${product}:${timeMode}:${timeMode === 'annual' ? annualIndex : monthIndex}`;
         }
 
         function saveState() {
-            onStateChange?.({ timeMode, product, metric, monthIndex, centralLongitude });
+            onStateChange?.({ timeMode, product, metric, annualIndex, monthIndex, centralLongitude, centralLatitude });
         }
 
         function redrawMap() {
             if (!displayedFrame || !displayedBoundaryPaths) return;
-            drawSpatialMap(renderCanvas, displayedFrame, metric, product, displayedBoundaryPaths, centralLongitude);
+            drawSpatialMap(renderCanvas, displayedFrame, metric, product, displayedBoundaryPaths, centralLongitude, centralLatitude);
             if (typeof renderCanvas.transferToImageBitmap === 'function') {
                 const image = renderCanvas.transferToImageBitmap();
                 visibleContext.drawImage(image, 0, 0);
@@ -1718,6 +2006,44 @@
             });
         }
 
+        function setLegendHighlight(band) {
+            if (band === highlightedLegendBand) return;
+            if (highlightedLegendBand) {
+                legend.querySelector(`[data-spatial-legend-band="${highlightedLegendBand}"]`)?.classList.remove('is-highlighted');
+            }
+            highlightedLegendBand = band;
+            if (band) {
+                legend.querySelector(`[data-spatial-legend-band="${band}"]`)?.classList.add('is-highlighted');
+            }
+        }
+
+        function clearMapHover() {
+            hoveredCellIndex = undefined;
+            hoverContext.clearRect(0, 0, hoverCanvas.width, hoverCanvas.height);
+            setLegendHighlight(undefined);
+        }
+
+        function updateMapHover(event) {
+            if (ENABLE_VERTICAL_MAP_ROTATION || !displayedFrame || dragPointerId !== undefined) {
+                clearMapHover();
+                return;
+            }
+            const bounds = canvas.getBoundingClientRect();
+            if (!bounds.width || !bounds.height) return;
+            const x = (event.clientX - bounds.left) * canvas.width / bounds.width;
+            const y = (event.clientY - bounds.top) * canvas.height / bounds.height;
+            const cellIndex = spatialCellIndexAtPoint(x, y, canvas.width, canvas.height, centralLongitude);
+            if (cellIndex === undefined || !spatialCellFillColor(displayedFrame, cellIndex, metric, product)) {
+                clearMapHover();
+                return;
+            }
+            if (cellIndex !== hoveredCellIndex) {
+                hoveredCellIndex = cellIndex;
+                drawSpatialCellHover(hoverContext, hoverCanvas, cellIndex, centralLongitude);
+            }
+            setLegendHighlight(spatialCellLegendBand(displayedFrame, cellIndex, metric));
+        }
+
         function setButtonState(buttons, selectedValue, datasetKey) {
             buttons.forEach(button => {
                 const isActive = button.dataset[datasetKey] === selectedValue;
@@ -1731,8 +2057,15 @@
             setButtonState(dataButtons, product, 'spatialProduct');
             setButtonState(metricButtons, metric, 'spatialMetric');
             monthNavigation.hidden = false;
-            previousMonth.disabled = timeMode !== 'monthly' || monthIndex === 0;
-            nextMonth.disabled = timeMode !== 'monthly' || monthIndex === SPATIAL_MAP_URLS[product].months.length - 1;
+            const periodIndex = timeMode === 'annual' ? annualIndex : monthIndex;
+            const periodCount = timeMode === 'annual'
+                ? SPATIAL_MAP_URLS[product].annuals.length
+                : SPATIAL_MAP_URLS[product].months.length;
+            previousMonth.disabled = periodIndex === 0;
+            nextMonth.disabled = periodIndex === periodCount - 1;
+            monthNavigation.setAttribute('aria-label', timeMode === 'annual' ? 'Browse annual maps' : 'Browse recent monthly maps');
+            previousMonth.setAttribute('aria-label', timeMode === 'annual' ? 'Previous year' : 'Previous month');
+            nextMonth.setAttribute('aria-label', timeMode === 'annual' ? 'Next year' : 'Next month');
             if (frame) {
                 period.textContent = spatialPeriodLabel(frame, timeMode);
             } else {
@@ -1742,33 +2075,39 @@
 
         function updateLegend(frame) {
             if (metric === 'signal') {
+                const inRangeSignalColors = SPATIAL_SIGNAL_COLOR_BANDS.slice(1, -1);
+                const signalBand = (color, index) => `<span class="dashboard-spatial-signal-band" data-spatial-legend-band="signal-${index}" style="background:${rgbColor(color)}"></span>`;
                 legend.innerHTML = `
                     <div class="dashboard-spatial-legend-scale">
-                        <span class="dashboard-spatial-gradient dashboard-spatial-gradient--signal" aria-hidden="true" style="background:${spatialSignalLegendGradient()}"></span>
-                        <div class="dashboard-spatial-legend-ticks" aria-hidden="true">
-                            <span>−4</span><span>−2</span><span>0</span><span>+2</span><span>+4</span>
+                        <div class="dashboard-spatial-signal-gradient-row" aria-hidden="true">
+                            <span class="dashboard-spatial-gradient-extension dashboard-spatial-gradient-extension--cold" data-spatial-legend-band="signal-0" style="background:${rgbColor(SPATIAL_SIGNAL_COLOR_BANDS[0])}"></span>
+                            <span class="dashboard-spatial-gradient dashboard-spatial-gradient--signal" style="grid-template-columns:repeat(${inRangeSignalColors.length}, minmax(0, 1fr))">${inRangeSignalColors.map((color, index) => signalBand(color, index + 1)).join('')}</span>
+                            <span class="dashboard-spatial-gradient-extension dashboard-spatial-gradient-extension--warm" data-spatial-legend-band="signal-${SPATIAL_SIGNAL_COLOR_BANDS.length - 1}" style="background:${rgbColor(SPATIAL_SIGNAL_COLOR_BANDS.at(-1))}"></span>
+                        </div>
+                        <div class="dashboard-spatial-legend-ticks dashboard-spatial-legend-ticks--signal" aria-hidden="true">
+                            <span style="left:0%">−5</span><span style="left:10%">−4</span><span style="left:20%">−3</span><span style="left:30%">−2</span><span style="left:40%">−1</span><span style="left:50%">0</span><span style="left:60%">1</span><span style="left:70%">2</span><span style="left:80%">3</span><span style="left:90%">4</span><span style="left:100%">5</span>
                         </div>
                     </div>
                     <p class="dashboard-spatial-legend-description">Temperature anomalies relative to the 1850–1900 mean (°C)</p>`;
                 return;
             }
 
-            const rankSwatch = color => `<span class="dashboard-spatial-rank-swatch" style="background:${rgbColor(color)}"></span>`;
+            const rankSwatch = (color, key) => `<span class="dashboard-spatial-rank-swatch" data-spatial-legend-band="${key}" style="background:${rgbColor(color)}"></span>`;
             legend.innerHTML = `
                 <div class="dashboard-spatial-legend-scale dashboard-spatial-legend-scale--rank">
                     <div class="dashboard-spatial-rank-swatches" aria-hidden="true">
                         <div class="dashboard-spatial-rank-swatch-group">
-                            ${rankSwatch(SPATIAL_COLD_RANK_COLORS[0])}
-                            ${rankSwatch(SPATIAL_COLD_RANK_COLORS[1])}
-                            ${rankSwatch(SPATIAL_COLD_RANK_COLORS[2])}
-                            ${rankSwatch(SPATIAL_COLD_RANK_COLORS[3])}
+                            ${rankSwatch(SPATIAL_COLD_RANK_COLORS[0], 'rank-cold-0')}
+                            ${rankSwatch(SPATIAL_COLD_RANK_COLORS[1], 'rank-cold-1')}
+                            ${rankSwatch(SPATIAL_COLD_RANK_COLORS[2], 'rank-cold-2')}
+                            ${rankSwatch(SPATIAL_COLD_RANK_COLORS[3], 'rank-cold-3')}
                         </div>
                         <span class="dashboard-spatial-rank-poles">cold&nbsp;|&nbsp;warm</span>
                         <div class="dashboard-spatial-rank-swatch-group">
-                            ${rankSwatch(SPATIAL_WARM_RANK_COLORS[3])}
-                            ${rankSwatch(SPATIAL_WARM_RANK_COLORS[2])}
-                            ${rankSwatch(SPATIAL_WARM_RANK_COLORS[1])}
-                            ${rankSwatch(SPATIAL_WARM_RANK_COLORS[0])}
+                            ${rankSwatch(SPATIAL_WARM_RANK_COLORS[3], 'rank-warm-3')}
+                            ${rankSwatch(SPATIAL_WARM_RANK_COLORS[2], 'rank-warm-2')}
+                            ${rankSwatch(SPATIAL_WARM_RANK_COLORS[1], 'rank-warm-1')}
+                            ${rankSwatch(SPATIAL_WARM_RANK_COLORS[0], 'rank-warm-0')}
                         </div>
                     </div>
                     <div class="dashboard-spatial-legend-ticks dashboard-spatial-legend-ticks--rank" aria-hidden="true">
@@ -1817,16 +2156,28 @@
             });
         }
 
+        function preloadAnnual(productKey, index) {
+            if (index < 0) return Promise.resolve();
+            return loadFrameFor(
+                `${productKey}:annual:${index}`,
+                SPATIAL_MAP_URLS[productKey].annuals[index]
+            ).catch(error => {
+                console.warn('Unable to preload a spatial annual map:', error);
+            });
+        }
+
         function renderFrame(frame, boundaryPaths) {
             displayedFrame = frame;
             displayedBoundaryPaths = boundaryPaths;
             redrawMap();
             updateControls(frame);
             updateLegend(frame);
-            canvas.setAttribute('aria-label', `${product === 'dcentI' ? 'DCENT-I' : 'DCENT'} ${metric === 'signal' ? 'warming signal' : 'temperature ranking'} map for ${spatialPeriodLabel(frame, timeMode)}. Drag left or right to rotate the map.`);
+            clearMapHover();
+            canvas.setAttribute('aria-label', `${product === 'dcentI' ? 'DCENT-I' : 'DCENT'} ${metric === 'signal' ? 'warming signal' : 'temperature ranking'} map for ${spatialPeriodLabel(frame, timeMode)}. Drag to rotate the map.`);
             status.hidden = true;
             hasRenderedFrame = true;
             if (timeMode === 'monthly') preloadMonth(product, monthIndex - 1);
+            else preloadAnnual(product, annualIndex - 1);
         }
 
         async function refresh() {
@@ -1860,6 +2211,7 @@
             const nextProduct = button.dataset.spatialProduct;
             if (nextProduct === product) return;
             product = nextProduct;
+            annualIndex = Math.min(annualIndex, SPATIAL_MAP_URLS[product].annuals.length - 1);
             monthIndex = Math.min(monthIndex, SPATIAL_MAP_URLS[product].months.length - 1);
             saveState();
             refresh();
@@ -1872,46 +2224,74 @@
             refresh();
         }));
         previousMonth.addEventListener('click', () => {
-            if (monthIndex === 0) return;
-            monthIndex -= 1;
+            if (timeMode === 'annual') {
+                if (annualIndex === 0) return;
+                annualIndex -= 1;
+            } else {
+                if (monthIndex === 0) return;
+                monthIndex -= 1;
+            }
             saveState();
             refresh();
         });
         nextMonth.addEventListener('click', () => {
-            if (monthIndex === SPATIAL_MAP_URLS[product].months.length - 1) return;
-            monthIndex += 1;
+            if (timeMode === 'annual') {
+                if (annualIndex === SPATIAL_MAP_URLS[product].annuals.length - 1) return;
+                annualIndex += 1;
+            } else {
+                if (monthIndex === SPATIAL_MAP_URLS[product].months.length - 1) return;
+                monthIndex += 1;
+            }
             saveState();
             refresh();
         });
 
         canvas.addEventListener('pointerdown', event => {
             if (event.button !== 0) return;
+            clearMapHover();
             dragPointerId = event.pointerId;
             dragStartX = event.clientX;
             dragStartLongitude = centralLongitude;
+            if (ENABLE_VERTICAL_MAP_ROTATION) {
+                dragStartY = event.clientY;
+                dragStartLatitude = centralLatitude;
+            }
             hasDragged = false;
             canvas.setPointerCapture(event.pointerId);
             canvas.classList.add('is-dragging');
             event.preventDefault();
         });
         canvas.addEventListener('pointermove', event => {
-            if (event.pointerId !== dragPointerId) return;
-            const canvasWidth = canvas.getBoundingClientRect().width;
-            if (!canvasWidth) return;
-            const longitudeShift = ((event.clientX - dragStartX) / canvasWidth) * 360;
-            if (Math.abs(longitudeShift) > 0.5) hasDragged = true;
+            if (event.pointerId !== dragPointerId) {
+                if (dragPointerId === undefined) updateMapHover(event);
+                return;
+            }
+            const canvasBounds = canvas.getBoundingClientRect();
+            if (!canvasBounds.width || !canvasBounds.height) return;
+            const longitudeShift = ((event.clientX - dragStartX) / canvasBounds.width) * 360;
+            const latitudeShift = ENABLE_VERTICAL_MAP_ROTATION
+                ? ((event.clientY - dragStartY) / canvasBounds.height) * 90
+                : 0;
+            if (Math.abs(longitudeShift) > 0.5 || Math.abs(latitudeShift) > 0.5) hasDragged = true;
             centralLongitude = normaliseCentralLongitude(dragStartLongitude - longitudeShift);
+            if (ENABLE_VERTICAL_MAP_ROTATION) {
+                centralLatitude = Math.max(-65, Math.min(65, dragStartLatitude + latitudeShift));
+            }
             scheduleMapRedraw();
         });
         const endMapDrag = event => {
             if (event.pointerId !== dragPointerId) return;
             dragPointerId = undefined;
             canvas.classList.remove('is-dragging');
+            clearMapHover();
             if (hasDragged) saveState();
         };
         canvas.addEventListener('pointerup', endMapDrag);
         canvas.addEventListener('pointercancel', endMapDrag);
         canvas.addEventListener('lostpointercapture', endMapDrag);
+        canvas.addEventListener('pointerleave', () => {
+            if (dragPointerId === undefined) clearMapHover();
+        });
 
         updateControls();
         return {
@@ -2072,6 +2452,8 @@
                                 <figure class="dashboard-figure dashboard-spatial-figure">
                                     <div class="dashboard-spatial-canvas-frame">
                                         <canvas class="dashboard-spatial-map-canvas" width="1100" height="600" role="img" aria-label="Loading spatial temperature map"></canvas>
+                                        <canvas class="dashboard-spatial-map-hover-canvas" width="1100" height="600" aria-hidden="true"></canvas>
+                                        <p class="dashboard-spatial-interaction-hint">Drag left or right to change the central longitude</p>
                                         <p class="dashboard-spatial-status" data-spatial-status>Spatial maps load when this view is opened.</p>
                                     </div>
                                     <div class="dashboard-spatial-legend" data-spatial-legend aria-live="polite"></div>
