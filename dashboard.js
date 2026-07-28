@@ -22,6 +22,43 @@
     const VERTICAL_HIT_TOLERANCE_PX = 19;
     const SVG_NS = 'http://www.w3.org/2000/svg';
     const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const SPATIAL_MAP_GRID = { longitudes: 72, latitudes: 36 };
+    const SPATIAL_MAP_URLS = {
+        dcentI: {
+            annual: 'https://dl.dropboxusercontent.com/scl/fi/soac74wlws2oop62glahg/DCENT-I_latest_year.txt?rlkey=mlpctb79rlbkuenihpu8v6wgv&dl=0',
+            months: [
+                'https://dl.dropboxusercontent.com/scl/fi/99te0fd5gzgrody2vabhd/DCENT-I_latest_month_minus_11.txt?rlkey=c2qvg4s3s72ls8a0q59u9k0p7&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/qvzuqzn2d3yrpu8yrdgij/DCENT-I_latest_month_minus_10.txt?rlkey=u2cdn7r03qtxxj6qlr0pyo30f&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/4riwgg00vngx5dcqb7fqr/DCENT-I_latest_month_minus_9.txt?rlkey=ys2u9yh4ph13iz6y836s1yvc2&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/alzyqcbi8s3teisvzl8ot/DCENT-I_latest_month_minus_8.txt?rlkey=j029ya36e33ihtxwvem6rw6fk&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/3ytgv9eqnmgcd2lvk0cca/DCENT-I_latest_month_minus_7.txt?rlkey=eu744vchdzhk1heiftz8lww1o&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/jwur0np502df1c4b5dxfc/DCENT-I_latest_month_minus_6.txt?rlkey=t3tm4sskk905q9dqahefhu1wk&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/rg9uv77puw7gihntgr2ca/DCENT-I_latest_month_minus_5.txt?rlkey=qaw41jt8nwdfm6wogw9n89yo4&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/udzd8b48mbaqkiq3dh84q/DCENT-I_latest_month_minus_4.txt?rlkey=sltvx06bqw7l1uhrza45md9ta&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/44q6al7oyd94xvi2922g2/DCENT-I_latest_month_minus_3.txt?rlkey=591ipy4zmphm0iwewhoze3grj&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/5n40b70tv8lnb20ce6wvb/DCENT-I_latest_month_minus_2.txt?rlkey=8m5pquan0z9uunztw41e1cqqd&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/gw2y4qzmtis36k1w7eh87/DCENT-I_latest_month_minus_1.txt?rlkey=rx5yj3lyaozc1pgmh73f7ialv&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/vfwhvfq8kxw4oq677tvze/DCENT-I_latest_month_minus_0.txt?rlkey=d002c133l71d6kylcss9wr1y7&dl=0'
+            ]
+        },
+        dcent: {
+            annual: 'https://dl.dropboxusercontent.com/scl/fi/acf1aloz4jhyewty3wlt6/DCENT_latest_year.txt?rlkey=36a0p0bssrfacpofcj3fe8cj9&dl=0',
+            months: [
+                'https://dl.dropboxusercontent.com/scl/fi/1btiaxtsl2zsv5ylkjveo/DCENT_latest_month_minus_11.txt?rlkey=1vcs7cwqo20uhark1200l7l2w&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/qs17ic343dpvutpxv4xxo/DCENT_latest_month_minus_10.txt?rlkey=yjx1g9qnijj5db1ovcaa81ae5&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/7peqrw66oqubkxoieobtg/DCENT_latest_month_minus_9.txt?rlkey=te1gvezvwpkr4pniqaq6jnanz&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/64oanedoy09kxs4y84oxu/DCENT_latest_month_minus_8.txt?rlkey=bgej1gmhe5xsbi0usrwzqgmk6&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/nmii74tm24lwbs1aomq9f/DCENT_latest_month_minus_7.txt?rlkey=y7krddeg6chl9z8xua4bue42b&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/mai5v5et7ggv8b0perpah/DCENT_latest_month_minus_6.txt?rlkey=tj3fhckvff4oju2rqeof1kvzm&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/prt402vywxp9jw0ue8bi4/DCENT_latest_month_minus_5.txt?rlkey=ph0q34zt0ihub1hx9ei7z911u&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/tav50z5noedon07v5if7b/DCENT_latest_month_minus_4.txt?rlkey=eu52ztlmcr0htuehitakp2lm0&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/8harvdq8unqpcfthjhil7/DCENT_latest_month_minus_3.txt?rlkey=085b5g0eui6gsgryu02fvuljm&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/q48zy376twt05nwdkkdrm/DCENT_latest_month_minus_2.txt?rlkey=us65z9m38of56k9wuuvdz3plb&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/9owo6wkqr2t1xj7djl149/DCENT_latest_month_minus_1.txt?rlkey=3tejaf42tkq2n8j5785ew8gn3&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/wbiqqnjv0lqishsb3p2fy/DCENT_latest_month_minus_0.txt?rlkey=2im1hd0koi7tttyhfa5vvye8h&dl=0'
+            ]
+        }
+    };
     const SERIES_STYLES = {
         dcentI: {
             key: 'dcentI',
@@ -1324,13 +1361,293 @@
         host.appendChild(svg);
     }
 
-    function initialiseCarousel(carousel) {
+    function parseSpatialMapFrame(text) {
+        const lines = text.replace(/\r/g, '').split('\n');
+        const header = lines.find(line => line.trim().startsWith('Year:'));
+        const dateMatch = header && header.match(/Year\s*:\s*(\d{4})(?:\s+Mon\s*:\s*(\d{1,2}))?/i);
+        const dataStart = lines.findIndex(line => line.trim().toLowerCase() === 'data:');
+        const rankingStart = lines.findIndex(line => line.trim().toLowerCase() === 'ranking:');
+
+        if (!dateMatch || dataStart === -1 || rankingStart === -1 || rankingStart <= dataStart) {
+            throw new Error('The spatial map file does not contain the expected date, data, and ranking sections.');
+        }
+
+        const parseGrid = (gridLines, label) => {
+            const rows = gridLines
+                .map(line => line.trim())
+                .filter(Boolean)
+                .map(line => line.split(',')
+                    .map(value => value.trim())
+                    .filter(Boolean)
+                    .map(value => Number.parseFloat(value)));
+
+            if (rows.length !== SPATIAL_MAP_GRID.longitudes || rows.some(row => row.length !== SPATIAL_MAP_GRID.latitudes)) {
+                throw new Error(`The ${label} grid does not have the expected ${SPATIAL_MAP_GRID.longitudes} × ${SPATIAL_MAP_GRID.latitudes} dimensions.`);
+            }
+
+            const grid = new Float32Array(SPATIAL_MAP_GRID.longitudes * SPATIAL_MAP_GRID.latitudes);
+            rows.forEach((row, longitudeIndex) => {
+                row.forEach((value, latitudeIndex) => {
+                    grid[longitudeIndex * SPATIAL_MAP_GRID.latitudes + latitudeIndex] = value;
+                });
+            });
+            return grid;
+        };
+
+        return {
+            year: Number.parseInt(dateMatch[1], 10),
+            month: dateMatch[2] ? Number.parseInt(dateMatch[2], 10) : undefined,
+            values: parseGrid(lines.slice(dataStart + 1, rankingStart), 'temperature'),
+            rankings: parseGrid(lines.slice(rankingStart + 1), 'ranking')
+        };
+    }
+
+    function spatialSignalColor(value) {
+        const cool = [48, 104, 183];
+        const neutral = [248, 249, 252];
+        const warm = [194, 43, 63];
+        const limit = 5;
+        if (value <= 0) return rgbColor(blendColor(cool, neutral, Math.max(0, (value + limit) / limit)));
+        return rgbColor(blendColor(neutral, warm, Math.min(1, value / limit)));
+    }
+
+    function spatialRankColor(rank) {
+        const record = [193, 42, 69];
+        const lowerRank = [250, 239, 205];
+        return rgbColor(blendColor(record, lowerRank, Math.max(0, Math.min(1, (rank - 1) / 5))));
+    }
+
+    function spatialPeriodLabel(frame, mode) {
+        if (mode === 'annual') return `${frame.year} annual mean`;
+        return `${MONTH_LABELS[frame.month - 1]} ${frame.year}`;
+    }
+
+    function drawSpatialMap(canvas, frame, metric) {
+        const context = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        const map = { left: 56, top: 20, width: 1016, height: 508 };
+        const cellWidth = map.width / SPATIAL_MAP_GRID.longitudes;
+        const cellHeight = map.height / SPATIAL_MAP_GRID.latitudes;
+        const field = metric === 'signal' ? frame.values : frame.rankings;
+
+        context.clearRect(0, 0, width, height);
+        context.fillStyle = '#f8faff';
+        context.fillRect(map.left, map.top, map.width, map.height);
+
+        for (let longitudeIndex = 0; longitudeIndex < SPATIAL_MAP_GRID.longitudes; longitudeIndex += 1) {
+            for (let latitudeIndex = 0; latitudeIndex < SPATIAL_MAP_GRID.latitudes; latitudeIndex += 1) {
+                const value = field[longitudeIndex * SPATIAL_MAP_GRID.latitudes + latitudeIndex];
+                if (!Number.isFinite(value) || (metric === 'rank' && value < 1)) continue;
+                context.fillStyle = metric === 'signal'
+                    ? spatialSignalColor(value)
+                    : spatialRankColor(value);
+                context.fillRect(
+                    map.left + longitudeIndex * cellWidth,
+                    map.top + (SPATIAL_MAP_GRID.latitudes - latitudeIndex - 1) * cellHeight,
+                    cellWidth + 0.25,
+                    cellHeight + 0.25
+                );
+            }
+        }
+
+        context.save();
+        context.strokeStyle = 'rgba(46, 76, 130, 0.27)';
+        context.lineWidth = 1;
+        [-60, -30, 0, 30, 60].forEach(latitude => {
+            const y = map.top + ((90 - latitude) / 180) * map.height;
+            context.beginPath();
+            context.moveTo(map.left, y);
+            context.lineTo(map.left + map.width, y);
+            context.stroke();
+        });
+        [0, 90, 180, 270, 360].forEach(longitude => {
+            const x = map.left + (longitude / 360) * map.width;
+            context.beginPath();
+            context.moveTo(x, map.top);
+            context.lineTo(x, map.top + map.height);
+            context.stroke();
+        });
+        context.strokeStyle = '#aebfdf';
+        context.strokeRect(map.left, map.top, map.width, map.height);
+        context.fillStyle = '#5570a9';
+        context.font = '500 18px Calibri, Arial, sans-serif';
+        context.textAlign = 'center';
+        [['0°', 0], ['90°E', 90], ['180°', 180], ['90°W', 270]].forEach(([label, longitude]) => {
+            context.fillText(label, map.left + (longitude / 360) * map.width, map.top + map.height + 29);
+        });
+        context.textAlign = 'right';
+        [-60, -30, 0, 30, 60].forEach(latitude => {
+            const y = map.top + ((90 - latitude) / 180) * map.height;
+            context.fillText(`${Math.abs(latitude)}°${latitude < 0 ? 'S' : latitude > 0 ? 'N' : ''}`, map.left - 9, y + 6);
+        });
+        context.restore();
+    }
+
+    function initialiseSpatialMap(host) {
+        const canvas = host.querySelector('.dashboard-spatial-map-canvas');
+        const period = host.closest('.dashboard-panel').querySelector('[data-spatial-period]');
+        const status = host.querySelector('[data-spatial-status]');
+        const legend = host.querySelector('[data-spatial-legend]');
+        const timeButtons = [...host.querySelectorAll('[data-spatial-time]')];
+        const dataButtons = [...host.querySelectorAll('[data-spatial-product]')];
+        const metricButtons = [...host.querySelectorAll('[data-spatial-metric]')];
+        const previousMonth = host.querySelector('[data-spatial-previous-month]');
+        const nextMonth = host.querySelector('[data-spatial-next-month]');
+        const monthNavigation = host.querySelector('[data-spatial-month-navigation]');
+        const cache = new Map();
+        let timeMode = 'annual';
+        let product = 'dcentI';
+        let metric = 'signal';
+        let monthIndex = SPATIAL_MAP_URLS.dcentI.months.length - 1;
+        let started = false;
+        let requestId = 0;
+
+        function currentUrl() {
+            return timeMode === 'annual'
+                ? SPATIAL_MAP_URLS[product].annual
+                : SPATIAL_MAP_URLS[product].months[monthIndex];
+        }
+
+        function currentKey() {
+            return `${product}:${timeMode}:${timeMode === 'annual' ? 'latest' : monthIndex}`;
+        }
+
+        function setButtonState(buttons, selectedValue, datasetKey) {
+            buttons.forEach(button => {
+                const isActive = button.dataset[datasetKey] === selectedValue;
+                button.classList.toggle('is-active', isActive);
+                button.setAttribute('aria-pressed', String(isActive));
+            });
+        }
+
+        function updateControls(frame) {
+            setButtonState(timeButtons, timeMode, 'spatialTime');
+            setButtonState(dataButtons, product, 'spatialProduct');
+            setButtonState(metricButtons, metric, 'spatialMetric');
+            monthNavigation.hidden = false;
+            previousMonth.disabled = timeMode !== 'monthly' || monthIndex === 0;
+            nextMonth.disabled = timeMode !== 'monthly' || monthIndex === SPATIAL_MAP_URLS[product].months.length - 1;
+            if (frame) {
+                period.textContent = spatialPeriodLabel(frame, timeMode);
+            } else {
+                period.textContent = timeMode === 'annual' ? 'Loading annual mean…' : 'Loading month…';
+            }
+        }
+
+        function updateLegend(frame) {
+            if (metric === 'signal') {
+                legend.innerHTML = `
+                    <span class="dashboard-spatial-legend-label">Warming signal</span>
+                    <span class="dashboard-spatial-gradient dashboard-spatial-gradient--signal" aria-hidden="true"></span>
+                    <span class="dashboard-spatial-legend-range">−5 °C</span>
+                    <span class="dashboard-spatial-legend-zero">0</span>
+                    <span class="dashboard-spatial-legend-range">+5 °C</span>`;
+                return;
+            }
+
+            const availableRanks = frame.rankings.filter(value => Number.isFinite(value) && value >= 1);
+            const maximumRank = availableRanks.length ? Math.max(...availableRanks) : 1;
+            legend.innerHTML = `
+                <span class="dashboard-spatial-legend-label">Warmth rank</span>
+                <span class="dashboard-spatial-gradient dashboard-spatial-gradient--rank" aria-hidden="true"></span>
+                <span class="dashboard-spatial-legend-range">1st (warmest)</span>
+                <span class="dashboard-spatial-legend-range">${ordinal(Math.round(maximumRank))}</span>`;
+        }
+
+        function loadFrameFor(key, url) {
+            if (!cache.has(key)) {
+                cache.set(key, fetchLiveText(url)
+                    .then(parseSpatialMapFrame)
+                    .catch(error => {
+                        cache.delete(key);
+                        throw error;
+                    }));
+            }
+            return cache.get(key);
+        }
+
+        function loadFrame() {
+            return loadFrameFor(currentKey(), currentUrl());
+        }
+
+        async function refresh() {
+            if (!started) return;
+            const localRequestId = ++requestId;
+            updateControls();
+            status.hidden = false;
+            status.textContent = 'Loading spatial map data…';
+            status.classList.remove('error');
+
+            try {
+                const frame = await loadFrame();
+                if (localRequestId !== requestId) return;
+                drawSpatialMap(canvas, frame, metric);
+                updateControls(frame);
+                updateLegend(frame);
+                canvas.setAttribute('aria-label', `${product === 'dcentI' ? 'DCENT-I' : 'DCENT'} ${metric === 'signal' ? 'warming signal' : 'warmth ranking'} map for ${spatialPeriodLabel(frame, timeMode)}`);
+                status.hidden = true;
+            } catch (error) {
+                if (localRequestId !== requestId) return;
+                status.textContent = 'The spatial map data could not be loaded. Please try again later.';
+                status.classList.add('error');
+                console.error('Unable to load spatial map data:', error);
+            }
+        }
+
+        timeButtons.forEach(button => button.addEventListener('click', () => {
+            const nextMode = button.dataset.spatialTime;
+            if (nextMode === timeMode) return;
+            timeMode = nextMode;
+            refresh();
+        }));
+        dataButtons.forEach(button => button.addEventListener('click', () => {
+            const nextProduct = button.dataset.spatialProduct;
+            if (nextProduct === product) return;
+            product = nextProduct;
+            refresh();
+        }));
+        metricButtons.forEach(button => button.addEventListener('click', () => {
+            const nextMetric = button.dataset.spatialMetric;
+            if (nextMetric === metric) return;
+            metric = nextMetric;
+            refresh();
+        }));
+        previousMonth.addEventListener('click', () => {
+            if (monthIndex === 0) return;
+            monthIndex -= 1;
+            refresh();
+        });
+        nextMonth.addEventListener('click', () => {
+            if (monthIndex === SPATIAL_MAP_URLS[product].months.length - 1) return;
+            monthIndex += 1;
+            refresh();
+        });
+
+        updateControls();
+        return {
+            ensureLoaded() {
+                if (started) return;
+                started = true;
+                refresh();
+            },
+            preloadDefault() {
+                return loadFrameFor('dcentI:annual:latest', SPATIAL_MAP_URLS.dcentI.annual)
+                    .catch(error => {
+                        console.warn('Unable to preload the default spatial map:', error);
+                    });
+            }
+        };
+    }
+
+    function initialiseCarousel(carousel, onActiveChange) {
         const viewport = carousel.querySelector('.dashboard-carousel-viewport');
         const slides = [...carousel.querySelectorAll('.dashboard-slide')];
         const previous = carousel.querySelector('[data-carousel-previous]');
         const next = carousel.querySelector('[data-carousel-next]');
         const dots = [...carousel.querySelectorAll('[data-carousel-slide]')];
         let activeIndex = 0;
+        let reportedIndex;
         let scrollFrame;
 
         function goTo(index) {
@@ -1356,6 +1673,10 @@
             previous.disabled = activeIndex === 0;
             next.disabled = activeIndex === slides.length - 1;
             dots.forEach((dot, index) => dot.setAttribute('aria-current', String(index === activeIndex)));
+            if (activeIndex !== reportedIndex) {
+                reportedIndex = activeIndex;
+                onActiveChange?.(activeIndex);
+            }
         }
 
         previous.addEventListener('click', () => goTo(activeIndex - 1));
@@ -1430,11 +1751,36 @@
                             </figure>
                         </section>
                     </article>
-                    <article class="dashboard-slide" aria-labelledby="maps-panel-heading">
-                        <section class="dashboard-panel dashboard-panel--placeholder">
-                            <span class="dashboard-panel-eyebrow">Next view</span>
-                            <h2 id="maps-panel-heading">Spatial maps</h2>
-                            <p>This panel is reserved for spatial views. No map is shown until the required data and map design are defined.</p>
+                    <article class="dashboard-slide" aria-label="Spatial temperature maps">
+                        <section class="dashboard-panel dashboard-panel--map" aria-label="Spatial temperature maps">
+                            <div class="dashboard-spatial-map">
+                                <div class="dashboard-spatial-top-controls" role="group" aria-label="Choose the map time scale">
+                                    <button class="dashboard-spatial-control is-active" type="button" data-spatial-time="annual" aria-pressed="true">Annual</button>
+                                    <button class="dashboard-spatial-control" type="button" data-spatial-time="monthly" aria-pressed="false">Monthly</button>
+                                    <div class="dashboard-spatial-month-navigation" data-spatial-month-navigation aria-label="Browse recent monthly maps">
+                                        <button class="dashboard-spatial-step" type="button" data-spatial-previous-month aria-label="Previous month">‹</button>
+                                        <button class="dashboard-spatial-step" type="button" data-spatial-next-month aria-label="Next month">›</button>
+                                    </div>
+                                </div>
+                                <p class="dashboard-spatial-period" data-spatial-period>Loading annual mean…</p>
+                                <figure class="dashboard-figure dashboard-spatial-figure">
+                                    <div class="dashboard-spatial-canvas-frame">
+                                        <canvas class="dashboard-spatial-map-canvas" width="1100" height="600" role="img" aria-label="Loading spatial temperature map"></canvas>
+                                        <p class="dashboard-spatial-status" data-spatial-status>Spatial maps load when this view is opened.</p>
+                                    </div>
+                                    <div class="dashboard-spatial-legend" data-spatial-legend aria-live="polite"></div>
+                                </figure>
+                                <div class="dashboard-spatial-bottom-controls">
+                                    <div class="dashboard-spatial-control-group" role="group" aria-label="Choose the temperature product">
+                                        <button class="dashboard-spatial-control is-active" type="button" data-spatial-product="dcentI" aria-pressed="true">DCENT-I</button>
+                                        <button class="dashboard-spatial-control" type="button" data-spatial-product="dcent" aria-pressed="false">DCENT</button>
+                                    </div>
+                                    <div class="dashboard-spatial-control-group" role="group" aria-label="Choose the map measure">
+                                        <button class="dashboard-spatial-control is-active" type="button" data-spatial-metric="signal" aria-pressed="true">Warming signal</button>
+                                        <button class="dashboard-spatial-control" type="button" data-spatial-metric="rank" aria-pressed="false">Warmth rank</button>
+                                    </div>
+                                </div>
+                            </div>
                         </section>
                     </article>
                     <article class="dashboard-slide" aria-labelledby="warming-stripes-heading">
@@ -1470,6 +1816,7 @@
         const chartHost = content.querySelector('.dashboard-chart:not(.dashboard-monthly-chart)');
         const monthlyChartHost = content.querySelector('.dashboard-monthly-chart');
         const stripeChartHost = content.querySelector('.dashboard-stripe-chart');
+        const spatialMap = initialiseSpatialMap(content.querySelector('.dashboard-spatial-map'));
         const monthlyProductButtons = [...content.querySelectorAll('[data-monthly-product]')];
         let annualCommonOffset;
         let monthlyRawDatasets;
@@ -1498,8 +1845,10 @@
         monthlyProductButtons.forEach(button => {
             button.addEventListener('click', () => setMonthlyProduct(button.dataset.monthlyProduct));
         });
-        initialiseCarousel(content.querySelector('.dashboard-carousel'));
-        Promise.allSettled([
+        initialiseCarousel(content.querySelector('.dashboard-carousel'), activeIndex => {
+            if (activeIndex === 2) spatialMap.ensureLoaded();
+        });
+        const annualDataRequest = Promise.allSettled([
             fetchLiveText(DCENT_LIVE_DATA_URL).then(parseDcentSeries),
             fetchLiveText(BERKELEY_LIVE_DATA_URL).then(parseBerkeleySeries),
             fetchLiveText(NOAA_LIVE_DATA_URL).then(parseNoaaSeries),
@@ -1562,7 +1911,7 @@
                 console.error('Unable to load annual GMST data:', error);
             });
 
-        fetchLiveText(DCENT_MONTHLY_LIVE_DATA_URL)
+        const monthlyDataRequest = fetchLiveText(DCENT_MONTHLY_LIVE_DATA_URL)
             .then(parseMonthlyDcentSeries)
             .then(datasets => {
                 monthlyRawDatasets = datasets;
@@ -1573,6 +1922,9 @@
                 monthlyChartHost.innerHTML = `<p class="dashboard-status error">The monthly GMST data could not be loaded. Please try again later.</p>`;
                 console.error('Unable to load monthly GMST data:', error);
             });
+
+        Promise.allSettled([annualDataRequest, monthlyDataRequest])
+            .then(() => spatialMap.preloadDefault());
     }
 
     document.addEventListener('include-html-loaded', event => {
