@@ -80,7 +80,7 @@ b, strong {font-family: 'Calibri', sans-serif; font-weight: 600;  color: #5573b3
 .dashboard-panel--map{display:flex;flex-direction:column}
 .dashboard-spatial-map{display:flex;flex:1;flex-direction:column}
 .dashboard-spatial-top-controls{display:flex;align-items:center;justify-content:center;gap:.45rem;margin:.25rem 0 .55rem}
-.dashboard-spatial-period{margin:.75rem 0 -.2rem;color:#cf6621;font:700 1.25rem/1.1 Calibri,Arial,sans-serif;text-align:center}
+.dashboard-spatial-period{position:relative;z-index:1;margin:.75rem 0 -.2rem;color:#cf6621;font:700 1.25rem/1.1 Calibri,Arial,sans-serif;text-align:center}
 .dashboard-spatial-control,.dashboard-spatial-step{appearance:none;border:1px solid #bfd1f8;background:#fff;color:#5474b8;font-family:Calibri,Arial,sans-serif;font-weight:600;cursor:pointer;transition:background-color .18s ease,border-color .18s ease,color .18s ease}
 .dashboard-spatial-control{padding:.22rem .65rem;border-radius:999px;font-size:.88rem;line-height:1.2}
 .dashboard-spatial-control:hover,.dashboard-spatial-step:hover:not(:disabled){border-color:#5474b8;background:#f5f8ff}
@@ -95,12 +95,19 @@ b, strong {font-family: 'Calibri', sans-serif; font-weight: 600;  color: #5573b3
 .dashboard-spatial-status{position:absolute;inset:0;display:grid;place-items:center;margin:0;padding:1rem;background:rgba(255,255,255,.78);color:#5474b8;font-size:1rem;text-align:center}
 .dashboard-spatial-status.error{color:#b24141}
 .dashboard-spatial-status[hidden]{display:none}
-.dashboard-spatial-legend{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.34rem;margin:.1rem 0 0;color:#6f7e9d;font:500 .82rem/1.2 Calibri,Arial,sans-serif}
+.dashboard-spatial-legend{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.34rem;min-height:4rem;margin:.1rem 0 0;color:#6f7e9d;font:500 .82rem/1.2 Calibri,Arial,sans-serif}
 .dashboard-spatial-legend-scale{width:min(27rem,82%)}
 .dashboard-spatial-gradient{display:block;width:100%;height:1.15rem;border:1px solid #d8e2f6;border-radius:999px}
-.dashboard-spatial-gradient--signal{background:linear-gradient(90deg,#2f14a0 0 4.1667%,#231db8 4.1667% 8.3333%,#1b33c7 8.3333% 12.5%,#1f4ed3 12.5% 16.6667%,#2f69da 16.6667% 20.8333%,#4888de 20.8333% 25%,#67a6dc 25% 29.1667%,#89c2de 29.1667% 33.3333%,#a9dbe0 33.3333% 37.5%,#c6ebe7 37.5% 41.6667%,#e1f4ed 41.6667% 45.8333%,#f6f8ee 45.8333% 50%,#fffbef 50% 54.1667%,#fbebda 54.1667% 58.3333%,#f9d7c3 58.3333% 62.5%,#f9bea6 62.5% 66.6667%,#f8a48b 66.6667% 70.8333%,#f78870 70.8333% 75%,#f16a5b 75% 79.1667%,#ea4e49 79.1667% 83.3333%,#dc3540 83.3333% 87.5%,#c5253d 87.5% 91.6667%,#ad1a39 91.6667% 95.8333%,#921233 95.8333% 100%)}
-.dashboard-spatial-gradient--rank{background:linear-gradient(90deg,#c12a45 0%,#faefcd 100%)}
+.dashboard-spatial-gradient--signal{background:#fff}
+.dashboard-spatial-gradient--rank{background:linear-gradient(90deg,#2c139d 0 12.5%,#2260d6 12.5% 25%,#67a6dc 25% 37.5%,#a1dce3 37.5% 50%,#f9b594 50% 62.5%,#ef584c 62.5% 75%,#cb2a41 75% 87.5%,#9a143d 87.5% 100%)}
 .dashboard-spatial-legend-ticks{display:flex;justify-content:space-between;margin-top:.25rem;color:#60729a;font:600 1.05rem/1 Calibri,Arial,sans-serif}
+.dashboard-spatial-legend-scale--rank{width:min(38rem,100%)}
+.dashboard-spatial-rank-swatches{display:flex;align-items:center;justify-content:center;gap:1rem}
+.dashboard-spatial-rank-swatch-group{display:grid;grid-template-columns:repeat(4,2.35rem);gap:.45rem}
+.dashboard-spatial-rank-swatch{width:2.35rem;height:1.12rem;border-radius:2px}
+.dashboard-spatial-rank-poles{min-width:6.2rem;color:#60729a;font:600 1rem/1 Calibri,Arial,sans-serif;text-align:center;white-space:nowrap}
+.dashboard-spatial-legend-ticks--rank{display:grid;grid-template-columns:auto 6.2rem auto;justify-content:center;gap:1rem;font-size:.9rem;line-height:1.05;text-align:center}
+.dashboard-spatial-rank-tick-group{display:grid;grid-template-columns:repeat(4,2.35rem);gap:.45rem}
 .dashboard-spatial-legend-description{margin:0;color:#667594;font:500 .94rem/1.2 Calibri,Arial,sans-serif;text-align:center}
 .dashboard-spatial-bottom-controls{display:flex;align-items:center;justify-content:center;gap:clamp(2.5rem,7vw,5.5rem);margin:1.5rem 0 .1rem}
 .dashboard-spatial-control-group{display:flex;align-items:center;gap:.4rem}

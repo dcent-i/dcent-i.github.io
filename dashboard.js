@@ -17,6 +17,7 @@
     const ALIGNMENT_END_YEAR = 2010;
     const WARMING_STRIPES_BASELINE_START_YEAR = 1961;
     const WARMING_STRIPES_BASELINE_END_YEAR = 2010;
+    const DASHBOARD_SESSION_STATE_KEY = 'dcent-dashboard-session-state-v1';
     const POINT_RADIUS = 3;
     const HOVER_POINT_RADIUS = 4.2;
     const ANNUAL_CHART_PLOT_HEIGHT = 550;
@@ -26,11 +27,17 @@
     const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const SPATIAL_MAP_GRID = { longitudes: 72, latitudes: 36 };
     const DCENT_MISSING_CELL_COLOR = '#d7d7d7';
+    const SPATIAL_COLD_RANK_COLORS = [[44, 19, 157], [34, 96, 214], [103, 166, 220], [161, 220, 227]];
+    const SPATIAL_WARM_RANK_COLORS = [[134, 20, 21], [203, 82, 95], [239, 168, 126], [249, 231, 178]];
+    const SPATIAL_SIGNAL_WARM_COLOR_BANDS = [
+        [255, 251, 239], [249, 231, 178], [244, 200, 152], [239, 168, 126],
+        [227, 139, 116], [215, 111, 105], [203, 82, 95], [180, 61, 70],
+        [157, 41, 46], [134, 20, 21], [104, 20, 21], [74, 20, 21]
+    ];
     const SPATIAL_SIGNAL_COLOR_BANDS = [
         [47, 20, 160], [35, 29, 184], [27, 51, 199], [31, 78, 211], [47, 105, 218], [72, 136, 222],
         [103, 166, 220], [137, 194, 222], [169, 219, 224], [198, 235, 231], [225, 244, 237], [246, 248, 238],
-        [255, 251, 239], [251, 235, 218], [249, 215, 195], [249, 190, 166], [248, 164, 139], [247, 136, 112],
-        [241, 106, 91], [234, 78, 73], [220, 53, 64], [197, 37, 61], [173, 26, 57], [146, 18, 51]
+        ...SPATIAL_SIGNAL_WARM_COLOR_BANDS
     ];
     const SPATIAL_MAP_URLS = {
         dcentI: {
@@ -413,6 +420,23 @@
             if (!response.ok) throw new Error(`The data source returned ${response.status}.`);
             return response.text();
         });
+    }
+
+    function readDashboardSessionState() {
+        try {
+            const value = sessionStorage.getItem(DASHBOARD_SESSION_STATE_KEY);
+            return value ? JSON.parse(value) : {};
+        } catch (error) {
+            return {};
+        }
+    }
+
+    function writeDashboardSessionState(state) {
+        try {
+            sessionStorage.setItem(DASHBOARD_SESSION_STATE_KEY, JSON.stringify(state));
+        } catch (error) {
+            // State persistence is optional; the dashboard remains usable if storage is unavailable.
+        }
     }
 
     function niceStep(value) {
@@ -1184,12 +1208,9 @@
     }
 
     function warmingStripeColor(value) {
-        const cool = [35, 91, 169];
-        const neutral = [247, 249, 252];
-        const warm = [195, 39, 63];
         const stripeLimit = 0.8;
-        if (value <= 0) return rgbColor(blendColor(cool, neutral, Math.max(0, (value + stripeLimit) / stripeLimit)));
-        return rgbColor(blendColor(neutral, warm, Math.min(1, value / stripeLimit)));
+        const normalizedValue = Math.max(0, Math.min(0.999999, (value + stripeLimit) / (2 * stripeLimit)));
+        return rgbColor(SPATIAL_SIGNAL_COLOR_BANDS[Math.floor(normalizedValue * SPATIAL_SIGNAL_COLOR_BANDS.length)]);
     }
 
     function renderWarmingStripes(host, records) {
@@ -1434,10 +1455,19 @@
         return rgbColor(SPATIAL_SIGNAL_COLOR_BANDS[Math.floor(normalizedValue * SPATIAL_SIGNAL_COLOR_BANDS.length)]);
     }
 
+    function spatialSignalLegendGradient() {
+        const bandWidth = 100 / SPATIAL_SIGNAL_COLOR_BANDS.length;
+        const stops = SPATIAL_SIGNAL_COLOR_BANDS.map((color, index) => {
+            const start = (index * bandWidth).toFixed(4);
+            const end = ((index + 1) * bandWidth).toFixed(4);
+            return `${rgbColor(color)} ${start}% ${end}%`;
+        });
+        return `linear-gradient(90deg, ${stops.join(', ')})`;
+    }
+
     function spatialRankColor(rank) {
-        const record = [193, 42, 69];
-        const lowerRank = [250, 239, 205];
-        return rgbColor(blendColor(record, lowerRank, Math.max(0, Math.min(1, (rank - 1) / 5))));
+        const colorIndex = Math.min(3, Math.max(0, Math.abs(Math.round(rank)) - 1));
+        return rgbColor((rank < 0 ? SPATIAL_COLD_RANK_COLORS : SPATIAL_WARM_RANK_COLORS)[colorIndex]);
     }
 
     function spatialPeriodLabel(frame, mode) {
@@ -1561,7 +1591,9 @@
                 const east = west + 5;
                 const south = -90 + latitudeIndex * 5;
                 const north = south + 5;
-                const isMissing = !Number.isFinite(value) || (metric === 'rank' && value < 1);
+                const isMissing = !Number.isFinite(value);
+                const isOutsideRankTopFive = metric === 'rank' && !isMissing && (value === 0 || Math.abs(value) > 5);
+                if (isOutsideRankTopFive) continue;
                 if (isMissing && product !== 'dcent') continue;
                 context.fillStyle = isMissing
                     ? DCENT_MISSING_CELL_COLOR
@@ -1592,7 +1624,7 @@
         context.restore();
     }
 
-    function initialiseSpatialMap(host) {
+    function initialiseSpatialMap(host, initialState = {}, onStateChange) {
         const canvas = host.querySelector('.dashboard-spatial-map-canvas');
         const period = host.closest('.dashboard-panel').querySelector('[data-spatial-period]');
         const status = host.querySelector('[data-spatial-status]');
@@ -1605,10 +1637,12 @@
         const monthNavigation = host.querySelector('[data-spatial-month-navigation]');
         const cache = new Map();
         let boundaryPathsPromise;
-        let timeMode = 'annual';
-        let product = 'dcentI';
-        let metric = 'signal';
-        let monthIndex = SPATIAL_MAP_URLS.dcentI.months.length - 1;
+        let timeMode = initialState.timeMode === 'monthly' ? 'monthly' : 'annual';
+        let product = initialState.product === 'dcent' ? 'dcent' : 'dcentI';
+        let metric = initialState.metric === 'rank' ? 'rank' : 'signal';
+        let monthIndex = Number.isInteger(initialState.monthIndex)
+            ? Math.max(0, Math.min(SPATIAL_MAP_URLS[product].months.length - 1, initialState.monthIndex))
+            : SPATIAL_MAP_URLS[product].months.length - 1;
         let started = false;
         let hasRenderedFrame = false;
         let requestId = 0;
@@ -1621,6 +1655,10 @@
 
         function currentKey() {
             return `${product}:${timeMode}:${timeMode === 'annual' ? 'latest' : monthIndex}`;
+        }
+
+        function saveState() {
+            onStateChange?.({ timeMode, product, metric, monthIndex });
         }
 
         function setButtonState(buttons, selectedValue, datasetKey) {
@@ -1649,7 +1687,7 @@
             if (metric === 'signal') {
                 legend.innerHTML = `
                     <div class="dashboard-spatial-legend-scale">
-                        <span class="dashboard-spatial-gradient dashboard-spatial-gradient--signal" aria-hidden="true"></span>
+                        <span class="dashboard-spatial-gradient dashboard-spatial-gradient--signal" aria-hidden="true" style="background:${spatialSignalLegendGradient()}"></span>
                         <div class="dashboard-spatial-legend-ticks" aria-hidden="true">
                             <span>−4</span><span>−2</span><span>0</span><span>+2</span><span>+4</span>
                         </div>
@@ -1658,16 +1696,30 @@
                 return;
             }
 
-            const availableRanks = frame.rankings.filter(value => Number.isFinite(value) && value >= 1);
-            const maximumRank = availableRanks.length ? Math.max(...availableRanks) : 1;
+            const rankSwatch = color => `<span class="dashboard-spatial-rank-swatch" style="background:${rgbColor(color)}"></span>`;
             legend.innerHTML = `
-                <div class="dashboard-spatial-legend-scale">
-                    <span class="dashboard-spatial-gradient dashboard-spatial-gradient--rank" aria-hidden="true"></span>
-                    <div class="dashboard-spatial-legend-ticks" aria-hidden="true">
-                        <span>1st</span><span>${ordinal(Math.round(maximumRank))}</span>
+                <div class="dashboard-spatial-legend-scale dashboard-spatial-legend-scale--rank">
+                    <div class="dashboard-spatial-rank-swatches" aria-hidden="true">
+                        <div class="dashboard-spatial-rank-swatch-group">
+                            ${rankSwatch(SPATIAL_COLD_RANK_COLORS[0])}
+                            ${rankSwatch(SPATIAL_COLD_RANK_COLORS[1])}
+                            ${rankSwatch(SPATIAL_COLD_RANK_COLORS[2])}
+                            ${rankSwatch(SPATIAL_COLD_RANK_COLORS[3])}
+                        </div>
+                        <span class="dashboard-spatial-rank-poles">cold&nbsp;|&nbsp;warm</span>
+                        <div class="dashboard-spatial-rank-swatch-group">
+                            ${rankSwatch(SPATIAL_WARM_RANK_COLORS[3])}
+                            ${rankSwatch(SPATIAL_WARM_RANK_COLORS[2])}
+                            ${rankSwatch(SPATIAL_WARM_RANK_COLORS[1])}
+                            ${rankSwatch(SPATIAL_WARM_RANK_COLORS[0])}
+                        </div>
                     </div>
-                </div>
-                <p class="dashboard-spatial-legend-description">Warmth rank within each grid-cell record</p>`;
+                    <div class="dashboard-spatial-legend-ticks dashboard-spatial-legend-ticks--rank" aria-hidden="true">
+                        <div class="dashboard-spatial-rank-tick-group"><span>1st</span><span>2nd</span><span>3rd</span><span>top 5</span></div>
+                        <span></span>
+                        <div class="dashboard-spatial-rank-tick-group"><span>top 5</span><span>3rd</span><span>2nd</span><span>1st</span></div>
+                    </div>
+                </div>`;
         }
 
         function loadFrameFor(key, url) {
@@ -1712,7 +1764,7 @@
             drawSpatialMap(canvas, frame, metric, product, boundaryPaths);
             updateControls(frame);
             updateLegend(frame);
-            canvas.setAttribute('aria-label', `${product === 'dcentI' ? 'DCENT-I' : 'DCENT'} ${metric === 'signal' ? 'warming signal' : 'warmth ranking'} map for ${spatialPeriodLabel(frame, timeMode)}`);
+            canvas.setAttribute('aria-label', `${product === 'dcentI' ? 'DCENT-I' : 'DCENT'} ${metric === 'signal' ? 'warming signal' : 'temperature ranking'} map for ${spatialPeriodLabel(frame, timeMode)}`);
             status.hidden = true;
             hasRenderedFrame = true;
             if (timeMode === 'monthly') preloadMonth(product, monthIndex - 1);
@@ -1742,28 +1794,34 @@
             const nextMode = button.dataset.spatialTime;
             if (nextMode === timeMode) return;
             timeMode = nextMode;
+            saveState();
             refresh();
         }));
         dataButtons.forEach(button => button.addEventListener('click', () => {
             const nextProduct = button.dataset.spatialProduct;
             if (nextProduct === product) return;
             product = nextProduct;
+            monthIndex = Math.min(monthIndex, SPATIAL_MAP_URLS[product].months.length - 1);
+            saveState();
             refresh();
         }));
         metricButtons.forEach(button => button.addEventListener('click', () => {
             const nextMetric = button.dataset.spatialMetric;
             if (nextMetric === metric) return;
             metric = nextMetric;
+            saveState();
             refresh();
         }));
         previousMonth.addEventListener('click', () => {
             if (monthIndex === 0) return;
             monthIndex -= 1;
+            saveState();
             refresh();
         });
         nextMonth.addEventListener('click', () => {
             if (monthIndex === SPATIAL_MAP_URLS[product].months.length - 1) return;
             monthIndex += 1;
+            saveState();
             refresh();
         });
 
@@ -1775,9 +1833,9 @@
                 if (hasRenderedFrame) return;
                 refresh();
             },
-            preloadDefault() {
+            preloadInitial() {
                 return Promise.all([
-                    loadFrameFor('dcentI:annual:latest', SPATIAL_MAP_URLS.dcentI.annual),
+                    loadFrame(),
                     loadBoundaryPaths()
                 ])
                     .then(([frame, boundaryPaths]) => {
@@ -1788,18 +1846,18 @@
                     });
             },
             preloadLatestMonth() {
-                return preloadMonth('dcentI', SPATIAL_MAP_URLS.dcentI.months.length - 1);
+                return preloadMonth(product, SPATIAL_MAP_URLS[product].months.length - 1);
             }
         };
     }
 
-    function initialiseCarousel(carousel, onActiveChange) {
+    function initialiseCarousel(carousel, onActiveChange, initialIndex = 0) {
         const viewport = carousel.querySelector('.dashboard-carousel-viewport');
         const slides = [...carousel.querySelectorAll('.dashboard-slide')];
         const previous = carousel.querySelector('[data-carousel-previous]');
         const next = carousel.querySelector('[data-carousel-next]');
         const dots = [...carousel.querySelectorAll('[data-carousel-slide]')];
-        let activeIndex = 0;
+        let activeIndex = Math.max(0, Math.min(slides.length - 1, Number.isInteger(initialIndex) ? initialIndex : 0));
         let reportedIndex;
         let scrollFrame;
 
@@ -1858,12 +1916,19 @@
             }
         });
 
+        if (activeIndex > 0) viewport.scrollLeft = slides[activeIndex].offsetLeft;
         updateActive();
     }
 
     function renderDashboard() {
         const content = document.querySelector('#dashboard .dashboard-content');
         if (!content || content.dataset.initialized === 'true') return;
+
+        const dashboardState = readDashboardSessionState();
+        function saveDashboardState(changes) {
+            Object.assign(dashboardState, changes);
+            writeDashboardSessionState(dashboardState);
+        }
 
         content.dataset.initialized = 'true';
         content.innerHTML = `
@@ -1930,7 +1995,7 @@
                                     </div>
                                     <div class="dashboard-spatial-control-group" role="group" aria-label="Choose the map measure">
                                         <button class="dashboard-spatial-control is-active" type="button" data-spatial-metric="signal" aria-pressed="true">Warming signal</button>
-                                        <button class="dashboard-spatial-control" type="button" data-spatial-metric="rank" aria-pressed="false">Warmth rank</button>
+                                        <button class="dashboard-spatial-control" type="button" data-spatial-metric="rank" aria-pressed="false">Temperature rank</button>
                                     </div>
                                 </div>
                             </div>
@@ -1970,15 +2035,21 @@
         const monthlyChartHost = content.querySelector('.dashboard-monthly-chart');
         const monthlySubtitle = content.querySelector('[data-monthly-subtitle]');
         const stripeChartHost = content.querySelector('.dashboard-stripe-chart');
-        const spatialMap = initialiseSpatialMap(content.querySelector('.dashboard-spatial-map'));
+        const spatialMap = initialiseSpatialMap(
+            content.querySelector('.dashboard-spatial-map'),
+            dashboardState.spatialMap,
+            spatialMapState => saveDashboardState({ spatialMap: spatialMapState })
+        );
         const monthlyProductButtons = [...content.querySelectorAll('[data-monthly-product]')];
         let annualCommonOffset;
         let monthlyRawDatasets;
         let monthlyDatasets;
         let monthlyChart;
+        let selectedMonthlyProduct = dashboardState.monthlyProduct === 'dcent' ? 'dcent' : 'dcentI';
 
         function setMonthlyProduct(key) {
             if (!monthlyChart) return;
+            selectedMonthlyProduct = key;
             monthlyChart.selectDataset(key);
             const dataset = monthlyDatasets.find(candidate => candidate.key === key);
             monthlySubtitle.innerHTML = monthlyRankingSubtitle(latestMonthlyRanking(dataset));
@@ -1987,6 +2058,7 @@
                 button.classList.toggle('is-active', isActive);
                 button.setAttribute('aria-pressed', String(isActive));
             });
+            saveDashboardState({ monthlyProduct: selectedMonthlyProduct });
         }
 
         function renderMonthlyWhenReady() {
@@ -1997,18 +2069,19 @@
                 monthlyChartHost,
                 monthlyDatasets
             );
-            setMonthlyProduct('dcentI');
+            setMonthlyProduct(selectedMonthlyProduct);
         }
 
         monthlyProductButtons.forEach(button => {
             button.addEventListener('click', () => setMonthlyProduct(button.dataset.monthlyProduct));
         });
         initialiseCarousel(content.querySelector('.dashboard-carousel'), activeIndex => {
+            saveDashboardState({ activeSlide: activeIndex });
             if (activeIndex === 2) {
                 spatialMap.ensureLoaded();
                 spatialMap.preloadLatestMonth();
             }
-        });
+        }, dashboardState.activeSlide);
         const annualDataRequest = Promise.allSettled([
             fetchLiveText(DCENT_LIVE_DATA_URL).then(parseDcentSeries),
             fetchLiveText(BERKELEY_LIVE_DATA_URL).then(parseBerkeleySeries),
@@ -2085,7 +2158,7 @@
             });
 
         Promise.allSettled([annualDataRequest, monthlyDataRequest])
-            .then(() => spatialMap.preloadDefault());
+            .then(() => spatialMap.preloadInitial());
     }
 
     document.addEventListener('include-html-loaded', event => {
