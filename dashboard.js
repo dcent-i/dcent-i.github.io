@@ -19,6 +19,7 @@
     const WARMING_STRIPES_BASELINE_END_YEAR = 2010;
     const POINT_RADIUS = 3;
     const HOVER_POINT_RADIUS = 4.2;
+    const ANNUAL_CHART_PLOT_HEIGHT = 550;
     const VERTICAL_HIT_TOLERANCE_PX = 19;
     const SVG_NS = 'http://www.w3.org/2000/svg';
     const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -468,10 +469,10 @@
 
     function renderChart(host, series, onSeriesFocus) {
         const width = 1100;
-        const height = 620;
         const margin = { top: 20, right: 40, bottom: 86, left: 88 };
+        const height = margin.top + ANNUAL_CHART_PLOT_HEIGHT + margin.bottom;
         const chartWidth = width - margin.left - margin.right;
-        const chartHeight = height - margin.top - margin.bottom;
+        const chartHeight = ANNUAL_CHART_PLOT_HEIGHT;
         const firstYear = Math.min(...series.flatMap(item => item.records.map(record => record.year)));
         const lastYear = Math.max(...series.flatMap(item => item.records.map(record => record.year)));
         const xDomainStart = firstYear - 0.5;

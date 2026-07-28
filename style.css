@@ -63,8 +63,8 @@ b, strong {font-family: 'Calibri', sans-serif; font-weight: 600;  color: #5573b3
 .dashboard-panel--placeholder h2{margin:.15rem 0 .35rem}
 .dashboard-panel--placeholder p{max-width:31rem;margin:0}
 .dashboard-panel-eyebrow{color:#6d82ad;font-size:.8rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
-.dashboard-chart-frame{width:100%;min-height:24rem}
-.dashboard-chart{width:100%;min-height:24rem}
+.dashboard-chart-frame{width:100%;min-height:26rem}
+.dashboard-chart{width:100%;min-height:26rem}
 .dashboard-chart svg{display:block;width:100%;height:auto;overflow:visible}
 .dashboard-status{margin:0;padding:7rem 1rem;color:var(--b700);text-align:center}
 .dashboard-status.error{color:#b24141}
