@@ -1642,6 +1642,13 @@
 
     function initialiseSpatialMap(host, initialState = {}, onStateChange) {
         const canvas = host.querySelector('.dashboard-spatial-map-canvas');
+        const renderCanvas = typeof OffscreenCanvas === 'function'
+            ? new OffscreenCanvas(canvas.width, canvas.height)
+            : document.createElement('canvas');
+        renderCanvas.width = canvas.width;
+        renderCanvas.height = canvas.height;
+        const renderContext = renderCanvas.getContext('2d');
+        const visibleContext = canvas.getContext('2d');
         const period = host.closest('.dashboard-panel').querySelector('[data-spatial-period]');
         const status = host.querySelector('[data-spatial-status]');
         const legend = host.querySelector('[data-spatial-legend]');
@@ -1689,7 +1696,18 @@
 
         function redrawMap() {
             if (!displayedFrame || !displayedBoundaryPaths) return;
-            drawSpatialMap(canvas, displayedFrame, metric, product, displayedBoundaryPaths, centralLongitude);
+            drawSpatialMap(renderCanvas, displayedFrame, metric, product, displayedBoundaryPaths, centralLongitude);
+            if (typeof renderCanvas.transferToImageBitmap === 'function') {
+                const image = renderCanvas.transferToImageBitmap();
+                visibleContext.drawImage(image, 0, 0);
+                image.close();
+            } else {
+                visibleContext.putImageData(
+                    renderContext.getImageData(0, 0, renderCanvas.width, renderCanvas.height),
+                    0,
+                    0
+                );
+            }
         }
 
         function scheduleMapRedraw() {
