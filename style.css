@@ -147,7 +147,6 @@ b, strong {font-family: 'Calibri', sans-serif; font-weight: 600;  color: #5573b3
 .dashboard-stripe{shape-rendering:crispEdges}
 .dashboard-stripe-sheen-layer{pointer-events:none}
 .dashboard-stripe-sheen{pointer-events:none}
-.dashboard-stripe-shadow{fill:none;stroke:#1f3155;stroke-opacity:.32;stroke-width:9;pointer-events:none}
 .dashboard-stripe-hit-area{fill:transparent;cursor:crosshair;pointer-events:all}
 .dashboard-stripe-credit-link{cursor:pointer}
 .dashboard-stripe-credit-text{fill:#7f8797;font-family:Calibri,Arial,sans-serif;font-size:1.2rem;font-style:italic;font-weight:400;letter-spacing:.01em}

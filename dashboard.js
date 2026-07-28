@@ -1260,14 +1260,6 @@
         const waveClipShape = appendSvg(waveClipPath, 'path', {
             d: `M ${margin.left} ${margin.top} H ${margin.left + chartWidth} V ${margin.top + chartHeight} H ${margin.left} Z`
         });
-        const shadowFilter = appendSvg(defs, 'filter', {
-            id: 'warming-stripes-shadow-filter',
-            x: '-10%',
-            y: '-100%',
-            width: '120%',
-            height: '300%'
-        });
-        appendSvg(shadowFilter, 'feGaussianBlur', { stdDeviation: 3 });
         const sheenGradient = appendSvg(defs, 'linearGradient', {
             id: 'warming-stripes-sheen',
             x1: '0%',
@@ -1319,11 +1311,6 @@
             fill: 'url(#warming-stripes-sheen)',
             opacity: 0
         });
-        const waveShadow = appendSvg(svg, 'path', {
-            class: 'dashboard-stripe-shadow',
-            filter: 'url(#warming-stripes-shadow-filter)',
-            opacity: 0
-        });
         const hitArea = appendSvg(svg, 'rect', {
             class: 'dashboard-stripe-hit-area',
             x: margin.left,
@@ -1341,24 +1328,28 @@
         appendSvg(creditLink, 'text', {
             class: 'dashboard-stripe-credit-text',
             x: width - margin.right - 12,
-            y: height - 16,
+            y: height - 10,
             'text-anchor': 'end'
         }, 'Visualisation concept inspired by Ed Hawkins’ Warming Stripes ↗');
         const peakLift = 50;
         const standardDeviationInStripes = 10;
         const standardDeviation = stripeWidth * standardDeviationInStripes;
+        const waveEntryDistance = standardDeviation * 3;
         let targetX = null;
         let renderedX = null;
+        let targetLiftScale = 0;
+        let renderedLiftScale = 0;
         let previousPointerX = null;
         let motionDirection = 1;
         let motionFrame = null;
+        let isExiting = false;
 
-        function stripeLift(stripeCentre, waveCentre) {
+        function stripeLift(stripeCentre, waveCentre, liftScale) {
             const distance = stripeCentre - waveCentre;
             const trailingSide = motionDirection > 0 ? distance < 0 : distance > 0;
             const localDeviation = standardDeviation * (trailingSide ? 1.3 : 0.72);
             if (Math.abs(distance) > localDeviation * 3) return 0;
-            return peakLift * Math.exp(-(distance ** 2) / (2 * localDeviation ** 2));
+            return peakLift * liftScale * Math.exp(-(distance ** 2) / (2 * localDeviation ** 2));
         }
 
         function liftStripe(stripe, index, lift) {
@@ -1376,17 +1367,18 @@
             if (!Number.isFinite(targetX)) return;
             if (!Number.isFinite(renderedX)) renderedX = targetX;
             renderedX += (targetX - renderedX) * 0.24;
+            renderedLiftScale += (targetLiftScale - renderedLiftScale) * 0.18;
 
             stripeElements.forEach((stripe, stripeIndex) => {
                 const stripeCentre = margin.left + (stripeIndex + 0.5) * stripeWidth;
-                liftStripe(stripe, stripeIndex, stripeLift(stripeCentre, renderedX));
+                liftStripe(stripe, stripeIndex, stripeLift(stripeCentre, renderedX, renderedLiftScale));
             });
             const sheenBias = motionDirection > 0 ? -standardDeviation * 0.16 : standardDeviation * 0.16;
             sheen.setAttribute('x', String(renderedX + sheenBias - sheenWidth * 0.48));
-            sheen.setAttribute('opacity', '1');
+            sheen.setAttribute('opacity', String(renderedLiftScale));
             const wavePoints = Array.from({ length: 65 }, (_, index) => {
                 const x = margin.left + chartWidth * index / 64;
-                const lift = stripeLift(x, renderedX);
+                const lift = stripeLift(x, renderedX, renderedLiftScale);
                 return {
                     x,
                     top: margin.top - lift,
@@ -1396,36 +1388,77 @@
             const waveTop = wavePoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.top}`).join(' ');
             const waveBottom = wavePoints.slice().reverse().map(point => `L ${point.x} ${point.bottom}`).join(' ');
             waveClipShape.setAttribute('d', `${waveTop} ${waveBottom} Z`);
-            waveShadow.setAttribute('d', wavePoints.map((point, index) => (
-                `${index === 0 ? 'M' : 'L'} ${point.x} ${point.bottom + 5}`
-            )).join(' '));
-            waveShadow.setAttribute('opacity', '1');
 
-            if (Math.abs(targetX - renderedX) > 0.25) {
+            if (Math.abs(targetX - renderedX) > 0.25 || Math.abs(targetLiftScale - renderedLiftScale) > 0.008) {
                 motionFrame = requestAnimationFrame(renderSilkWave);
+            } else if (isExiting) {
+                targetX = null;
+                renderedX = null;
+                targetLiftScale = 0;
+                renderedLiftScale = 0;
+                previousPointerX = null;
+                isExiting = false;
+                stripeElements.forEach((stripe, index) => liftStripe(stripe, index, 0));
+                sheen.setAttribute('opacity', '0');
             }
         }
 
-        hitArea.addEventListener('pointermove', event => {
+        function setWaveTarget(event) {
             const bounds = svg.getBoundingClientRect();
             const pointerX = (event.clientX - bounds.left) * (width / bounds.width);
-            const clampedPointerX = Math.max(margin.left, Math.min(width - margin.right, pointerX));
-            if (Number.isFinite(previousPointerX) && Math.abs(clampedPointerX - previousPointerX) > 0.2) {
-                motionDirection = Math.sign(clampedPointerX - previousPointerX);
+            const extendedPointerX = Math.max(
+                margin.left - waveEntryDistance,
+                Math.min(width - margin.right + waveEntryDistance, pointerX)
+            );
+            if (Number.isFinite(previousPointerX) && Math.abs(extendedPointerX - previousPointerX) > 0.2) {
+                motionDirection = Math.sign(extendedPointerX - previousPointerX);
             }
-            previousPointerX = clampedPointerX;
-            targetX = clampedPointerX;
+            previousPointerX = extendedPointerX;
+            targetX = extendedPointerX;
+            targetLiftScale = 1;
+            isExiting = false;
             if (motionFrame === null) motionFrame = requestAnimationFrame(renderSilkWave);
+        }
+
+        function moveWaveOut(direction) {
+            if (!Number.isFinite(renderedX)) return;
+            targetX = direction < 0
+                ? margin.left - waveEntryDistance
+                : width - margin.right + waveEntryDistance;
+            targetLiftScale = 1;
+            isExiting = true;
+            if (motionFrame === null) motionFrame = requestAnimationFrame(renderSilkWave);
+        }
+
+        function flattenWaveInPlace() {
+            if (!Number.isFinite(renderedX)) return;
+            targetX = renderedX;
+            targetLiftScale = 0;
+            isExiting = true;
+            if (motionFrame === null) motionFrame = requestAnimationFrame(renderSilkWave);
+        }
+
+        hitArea.addEventListener('pointermove', setWaveTarget);
+        const carouselViewport = host.closest('.dashboard-carousel-viewport');
+        carouselViewport?.addEventListener('pointermove', event => {
+            const stripeBounds = hitArea.getBoundingClientRect();
+            const horizontalActivationDistance = waveEntryDistance * (stripeBounds.width / chartWidth);
+            const horizontalDistance = event.clientX < stripeBounds.left
+                ? stripeBounds.left - event.clientX
+                : event.clientX > stripeBounds.right
+                    ? event.clientX - stripeBounds.right
+                    : 0;
+            const isVerticallyAligned = event.clientY >= stripeBounds.top && event.clientY <= stripeBounds.bottom;
+            if (isVerticallyAligned && horizontalDistance <= horizontalActivationDistance) {
+                setWaveTarget(event);
+            } else if (!isVerticallyAligned) {
+                flattenWaveInPlace();
+            } else {
+                moveWaveOut(event.clientX < stripeBounds.left ? -1 : 1);
+            }
         });
-        hitArea.addEventListener('pointerleave', () => {
-            targetX = null;
-            renderedX = null;
-            previousPointerX = null;
-            if (motionFrame !== null) cancelAnimationFrame(motionFrame);
-            motionFrame = null;
-            stripeElements.forEach((stripe, index) => liftStripe(stripe, index, 0));
-            sheen.setAttribute('opacity', '0');
-            waveShadow.setAttribute('opacity', '0');
+        carouselViewport?.addEventListener('pointerleave', () => {
+            flattenWaveInPlace();
         });
 
         host.appendChild(svg);
