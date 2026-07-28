@@ -1572,6 +1572,16 @@
             return loadFrameFor(currentKey(), currentUrl());
         }
 
+        function preloadMonth(productKey, index) {
+            if (index < 0) return Promise.resolve();
+            return loadFrameFor(
+                `${productKey}:monthly:${index}`,
+                SPATIAL_MAP_URLS[productKey].months[index]
+            ).catch(error => {
+                console.warn('Unable to preload a spatial monthly map:', error);
+            });
+        }
+
         function renderFrame(frame) {
             drawSpatialMap(canvas, frame, metric);
             updateControls(frame);
@@ -1579,6 +1589,7 @@
             canvas.setAttribute('aria-label', `${product === 'dcentI' ? 'DCENT-I' : 'DCENT'} ${metric === 'signal' ? 'warming signal' : 'warmth ranking'} map for ${spatialPeriodLabel(frame, timeMode)}`);
             status.hidden = true;
             hasRenderedFrame = true;
+            if (timeMode === 'monthly') preloadMonth(product, monthIndex - 1);
         }
 
         async function refresh() {
@@ -1646,6 +1657,9 @@
                     .catch(error => {
                         console.warn('Unable to preload the default spatial map:', error);
                     });
+            },
+            preloadLatestMonth() {
+                return preloadMonth('dcentI', SPATIAL_MAP_URLS.dcentI.months.length - 1);
             }
         };
     }
@@ -1856,7 +1870,10 @@
             button.addEventListener('click', () => setMonthlyProduct(button.dataset.monthlyProduct));
         });
         initialiseCarousel(content.querySelector('.dashboard-carousel'), activeIndex => {
-            if (activeIndex === 2) spatialMap.ensureLoaded();
+            if (activeIndex === 2) {
+                spatialMap.ensureLoaded();
+                spatialMap.preloadLatestMonth();
+            }
         });
         const annualDataRequest = Promise.allSettled([
             fetchLiveText(DCENT_LIVE_DATA_URL).then(parseDcentSeries),
