@@ -1501,6 +1501,7 @@
         let metric = 'signal';
         let monthIndex = SPATIAL_MAP_URLS.dcentI.months.length - 1;
         let started = false;
+        let hasRenderedFrame = false;
         let requestId = 0;
 
         function currentUrl() {
@@ -1571,6 +1572,15 @@
             return loadFrameFor(currentKey(), currentUrl());
         }
 
+        function renderFrame(frame) {
+            drawSpatialMap(canvas, frame, metric);
+            updateControls(frame);
+            updateLegend(frame);
+            canvas.setAttribute('aria-label', `${product === 'dcentI' ? 'DCENT-I' : 'DCENT'} ${metric === 'signal' ? 'warming signal' : 'warmth ranking'} map for ${spatialPeriodLabel(frame, timeMode)}`);
+            status.hidden = true;
+            hasRenderedFrame = true;
+        }
+
         async function refresh() {
             if (!started) return;
             const localRequestId = ++requestId;
@@ -1582,11 +1592,7 @@
             try {
                 const frame = await loadFrame();
                 if (localRequestId !== requestId) return;
-                drawSpatialMap(canvas, frame, metric);
-                updateControls(frame);
-                updateLegend(frame);
-                canvas.setAttribute('aria-label', `${product === 'dcentI' ? 'DCENT-I' : 'DCENT'} ${metric === 'signal' ? 'warming signal' : 'warmth ranking'} map for ${spatialPeriodLabel(frame, timeMode)}`);
-                status.hidden = true;
+                renderFrame(frame);
             } catch (error) {
                 if (localRequestId !== requestId) return;
                 status.textContent = 'The spatial map data could not be loaded. Please try again later.';
@@ -1629,10 +1635,14 @@
             ensureLoaded() {
                 if (started) return;
                 started = true;
+                if (hasRenderedFrame) return;
                 refresh();
             },
             preloadDefault() {
                 return loadFrameFor('dcentI:annual:latest', SPATIAL_MAP_URLS.dcentI.annual)
+                    .then(frame => {
+                        if (!started) renderFrame(frame);
+                    })
                     .catch(error => {
                         console.warn('Unable to preload the default spatial map:', error);
                     });
