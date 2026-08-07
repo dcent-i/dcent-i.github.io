@@ -4,8 +4,16 @@
 (() => {
     'use strict';
 
-    const DCENT_LIVE_DATA_URL = 'https://dl.dropboxusercontent.com/scl/fi/c8ohkby3kbq98jyx7c7i1/DCENT_DCENT_I_GMST_annual_statistics.txt?rlkey=wt7436fexkijiqfltnvt43681&st=px7uqc2n&dl=0';
-    const DCENT_MONTHLY_LIVE_DATA_URL = 'https://dl.dropboxusercontent.com/scl/fi/fuirz2t34i421d2nsehkr/DCENT_DCENT_I_GMST_monthly_statistics.txt?rlkey=yvh9slt1buw6ptx56rkpuwzhc&st=fkbmn0c9&dl=0';
+    const DCENT_GMST_DATA_URLS = {
+        final: {
+            annual: 'https://dl.dropboxusercontent.com/scl/fi/c8ohkby3kbq98jyx7c7i1/DCENT_DCENT_I_GMST_annual_statistics.txt?rlkey=wt7436fexkijiqfltnvt43681&st=px7uqc2n&dl=0',
+            monthly: 'https://dl.dropboxusercontent.com/scl/fi/fuirz2t34i421d2nsehkr/DCENT_DCENT_I_GMST_monthly_statistics.txt?rlkey=yvh9slt1buw6ptx56rkpuwzhc&st=fkbmn0c9&dl=0'
+        },
+        live: {
+            annual: 'https://dl.dropboxusercontent.com/scl/fi/omvhfj0h14m7xkilu0vpu/DCENT_DCENT_I_GMST_annual_statistics_live.txt?rlkey=fzipvcjjky2bp4kjrkirj7cgp&dl=0',
+            monthly: 'https://dl.dropboxusercontent.com/scl/fi/u1r6bey4apyg92ni9ynqj/DCENT_DCENT_I_GMST_monthly_statistics_live.txt?rlkey=d6hswqpedyfrat6n67avfk6ma&dl=0'
+        }
+    };
     const BERKELEY_LIVE_DATA_URL = 'https://storage.googleapis.com/storage/v1/b/berkeley-earth-temperature-hr/o/global%2FGlobal_TAVG_annual.txt?alt=media';
     const NOAA_LIVE_DATA_URL = 'https://www.ncei.noaa.gov/data/noaa-global-surface-temperature/v6.1/access/timeseries/aravg.ann.land_ocean.90S.90N.v6.1.0.202606.asc';
     const HADCRUT_LOCAL_DATA_URL = 'data/HadCRUT.5.1.0.0.analysis.summary_series.global.annual.csv';
@@ -97,6 +105,54 @@
             ]
         }
     };
+    const SPATIAL_LIVE_MAP_URLS = {
+        dcentI: {
+            annuals: [
+                'https://dl.dropboxusercontent.com/scl/fi/vycfb5rsa41x28lu04rel/DCENT-I_live_latest_year_minus_4.txt?rlkey=w9rdpa26vx7tmx62wrtob0x10&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/ib4xsoleow32wllh39r6x/DCENT-I_live_latest_year_minus_3.txt?rlkey=yes7400l2i71snxj5j0kte4s2&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/jfdl995ykddiuw6uor0ho/DCENT-I_live_latest_year_minus_2.txt?rlkey=wxassqo9zpvb0mipl5edbzxog&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/mbakec82ra8819p342wys/DCENT-I_live_latest_year_minus_1.txt?rlkey=1iv4n5ii4znu37h0g02gxs3ut&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/ukr85jgun0ko7xdejrfkp/DCENT-I_live_latest_year.txt?rlkey=5sv952a30r9x4s09h2z6abb66&dl=0'
+            ],
+            months: [
+                'https://dl.dropboxusercontent.com/scl/fi/uats1kpgvcpd2573xwiyg/DCENT-I_live_latest_month_minus_11.txt?rlkey=dqdq31s1rvbc11py4becrw2v2&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/05uh5da4ihqqv4vvn16pd/DCENT-I_live_latest_month_minus_10.txt?rlkey=o9cc5v6iwk4mm27fs2amfat5t&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/2clh005ihfmrkc807z3v7/DCENT-I_live_latest_month_minus_9.txt?rlkey=lybulgvf1weiv59g484j6omdn&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/vv8mjwoamojp8uusgwt9j/DCENT-I_live_latest_month_minus_8.txt?rlkey=srolruic3xu4tmpdjbr91t1bo&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/c6ped26kbxemnbabt271e/DCENT-I_live_latest_month_minus_7.txt?rlkey=fikf09za9weftuhk16clwlx8d&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/c8ycoqc0297t52hraly0y/DCENT-I_live_latest_month_minus_6.txt?rlkey=bwcdw0l2o7k70jm2lwamd3k35&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/z90aii6poxxkyq9h5tmhg/DCENT-I_live_latest_month_minus_5.txt?rlkey=4jq6getfplo16zq9vsmlfd77u&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/fkue65pck4eaa22nckhxm/DCENT-I_live_latest_month_minus_4.txt?rlkey=hrpbnksdvoopjfkpg8k993z14&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/t9vqp8r1x0f1vu16tqzbm/DCENT-I_live_latest_month_minus_3.txt?rlkey=9crj50h58olf1wway7mh75x8d&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/50q0xh389s2rsefbqr4x6/DCENT-I_live_latest_month_minus_2.txt?rlkey=toit21oit2b9f2zbg84mrfmhy&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/m1o7mnxuz6h19ctvuk1qk/DCENT-I_live_latest_month_minus_1.txt?rlkey=94zoo322z6zva8l7xgauj0qyj&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/gm2gpbkam40cjk541q634/DCENT-I_live_latest_month_minus_0.txt?rlkey=7r0o23dwk5e5vlxfw4aw9kfwy&dl=0'
+            ]
+        },
+        dcent: {
+            annuals: [
+                'https://dl.dropboxusercontent.com/scl/fi/38a8epygtt42u4jxh0bfl/DCENT_live_latest_year_minus_4.txt?rlkey=xod61vpqdv32v1padfkvicm5m&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/7lp8z4ujo233g61ubgx5e/DCENT_live_latest_year_minus_3.txt?rlkey=eu2agurphl0jsxghrqckcfm61&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/k6yjjk6mau02ef0h80wk8/DCENT_live_latest_year_minus_2.txt?rlkey=fukwbbd7kacosy1yjxmrcvy39&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/a0kshdzz555c1kvd1qip3/DCENT_live_latest_year_minus_1.txt?rlkey=h5y7ksiuzcx9sz7f47pl8q28c&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/y22jwun82zk4omxcyzmro/DCENT_live_latest_year.txt?rlkey=ioa6nhyvf3h66hofjtgovoz19&dl=0'
+            ],
+            months: [
+                'https://dl.dropboxusercontent.com/scl/fi/velehgn7078ngiomn6atn/DCENT_live_latest_month_minus_11.txt?rlkey=hambx1f75kb5op8voxrulv3to&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/hui2mpj41pec4leiigpp7/DCENT_live_latest_month_minus_10.txt?rlkey=8kxybhkmqkdkwiqy9p4u6stv0&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/3y6v0uzia7sln1a1xlzj7/DCENT_live_latest_month_minus_9.txt?rlkey=03gh2gqxluqoqu4yov251ftkf&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/7j530ac43rxx9ie01eiiv/DCENT_live_latest_month_minus_8.txt?rlkey=6u07jxnbf4pqgd195keqjx4s2&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/cru8fm8wosop1mhr6hqum/DCENT_live_latest_month_minus_7.txt?rlkey=75nqzpem2lagvhyteyvozislk&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/d3m0ig6l3h5064mxckh0b/DCENT_live_latest_month_minus_6.txt?rlkey=v57t935biie76cshrlsn696ks&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/e4vgex2khmln5b4g76m2p/DCENT_live_latest_month_minus_5.txt?rlkey=9cb4py9id2svvgmzmozulmr2i&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/ak054vordq9uubuj76iz0/DCENT_live_latest_month_minus_4.txt?rlkey=wivty1r4knsaywhv4eivc8m5r&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/v3ddvh629y1iau9ddvh6f/DCENT_live_latest_month_minus_3.txt?rlkey=l9yxxnlq6m9pw31ahxm45hoio&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/cl6xbytv1yn0cxjaqsx80/DCENT_live_latest_month_minus_2.txt?rlkey=gp3pasu5wvklbrn2oc08tvy9w&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/25evbwa539satirugkozh/DCENT_live_latest_month_minus_1.txt?rlkey=kfxc7ys1anzbrnhp8dz614fwo&dl=0',
+                'https://dl.dropboxusercontent.com/scl/fi/ab1q69s84unq8bfdv3p2h/DCENT_live_latest_month_minus_0.txt?rlkey=8iz0b89rvw1lj90z9uopps560&dl=0'
+            ]
+        }
+    };
     const WORLD_BOUNDARIES_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
     const SERIES_STYLES = {
         dcentI: {
@@ -155,6 +211,23 @@
         }
     };
 
+    function selectedDashboardDataRelease() {
+        const accessIncludeSource = document.querySelector('#access [data-include-source]')
+            ?.dataset.includeSource;
+
+        return accessIncludeSource === 'sections/access_live.html' ? 'live' : 'final';
+    }
+
+    function dcentGmstDataUrlsForSelectedAccess() {
+        return DCENT_GMST_DATA_URLS[selectedDashboardDataRelease()];
+    }
+
+    function spatialMapUrlsForSelectedAccess() {
+        return selectedDashboardDataRelease() === 'live'
+            ? SPATIAL_LIVE_MAP_URLS
+            : SPATIAL_MAP_URLS;
+    }
+
     function svgEl(name, attributes = {}) {
         const element = document.createElementNS(SVG_NS, name);
         Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, value));
@@ -184,6 +257,22 @@
             ...(Number.isFinite(record.lower) ? { lower: record.lower - baselineMean } : {}),
             ...(Number.isFinite(record.upper) ? { upper: record.upper - baselineMean } : {})
         }));
+    }
+
+    function annualMeanForPeriod(records, startYear, endYear, label) {
+        const values = records
+            .filter(record => record.year >= startYear && record.year <= endYear)
+            .map(record => record.value);
+        const expectedLength = endYear - startYear + 1;
+        if (values.length !== expectedLength || !values.every(Number.isFinite)) {
+            throw new Error(`${label} do not contain a complete ${startYear}–${endYear} annual baseline.`);
+        }
+        return values.reduce((sum, value) => sum + value, 0) / values.length;
+    }
+
+    function annualReferenceDelta(records, label) {
+        return annualMeanForPeriod(records, ALIGNMENT_START_YEAR, ALIGNMENT_END_YEAR, label)
+            - annualMeanForPeriod(records, BASELINE_START_YEAR, BASELINE_END_YEAR, label);
     }
 
     function alignToCommonPreindustrialReference(series) {
@@ -227,11 +316,6 @@
         };
     }
 
-    function completedYears(records) {
-        const latestCompletedYear = new Date().getFullYear() - 1;
-        return records.filter(record => record.year <= latestCompletedYear);
-    }
-
     function parseDcentSeries(text) {
         const lines = text.replace(/\r/g, '').split('\n');
         const headerIndex = lines.findIndex(line => line.trim().startsWith('Year,'));
@@ -240,7 +324,7 @@
             throw new Error('The live data file does not contain the expected header.');
         }
 
-        const records = completedYears(lines.slice(headerIndex + 1)
+        const records = lines.slice(headerIndex + 1)
             .map(line => line.split(',').map(value => Number.parseFloat(value.trim())))
             .filter(values => values.length === 5 && values.every(Number.isFinite))
             .map(([year, dcentI, dcentISd, dcent, dcentSd]) => ({
@@ -249,28 +333,33 @@
                 dcentISd,
                 dcent,
                 dcentSd
-            })));
+            }));
 
         if (records.length < 2) {
             throw new Error('The live data file does not contain enough annual records.');
         }
 
+        const dcentIAnnualRecords = records.map(record => ({
+            year: record.year,
+            value: record.dcentI,
+            uncertainty: record.dcentISd * CONFIDENCE_INTERVAL_SD
+        }));
+        const dcentAnnualRecords = records.map(record => ({
+            year: record.year,
+            value: record.dcent,
+            uncertainty: record.dcentSd * CONFIDENCE_INTERVAL_SD
+        }));
+
         return [
             {
                 ...SERIES_STYLES.dcentI,
-                records: rebaseAnomalies(records.map(record => ({
-                    year: record.year,
-                    value: record.dcentI,
-                    uncertainty: record.dcentISd * CONFIDENCE_INTERVAL_SD
-                })))
+                annualReferenceDelta: annualReferenceDelta(dcentIAnnualRecords, 'DCENT-I annual data'),
+                records: rebaseAnomalies(dcentIAnnualRecords)
             },
             {
                 ...SERIES_STYLES.dcent,
-                records: rebaseAnomalies(records.map(record => ({
-                    year: record.year,
-                    value: record.dcent,
-                    uncertainty: record.dcentSd * CONFIDENCE_INTERVAL_SD
-                })))
+                annualReferenceDelta: annualReferenceDelta(dcentAnnualRecords, 'DCENT annual data'),
+                records: rebaseAnomalies(dcentAnnualRecords)
             }
         ];
     }
@@ -286,7 +375,6 @@
             throw new Error('The live monthly data file does not contain both DCENT-I and DCENT tables.');
         }
 
-        const latestCompletedYear = new Date().getFullYear() - 1;
         const parseTable = (startIndex, endIndex) => {
             const rows = lines.slice(startIndex + 1, endIndex)
                 .map(line => line.split(',').map(value => value.trim()))
@@ -309,11 +397,7 @@
                     end: availableMonths[availableMonths.length - 1]
                 } : null,
                 records: rows
-                    .filter(row => (
-                        row.closingYear === row.year
-                        && row.months.every(Number.isFinite)
-                        && row.year <= latestCompletedYear
-                    ))
+                    .filter(row => row.months.some(Number.isFinite))
                     .map(row => ({ year: row.year, months: row.months }))
             };
         };
@@ -321,7 +405,7 @@
         const dcentI = parseTable(headerIndices[0], headerIndices[1]);
         const dcent = parseTable(headerIndices[1], lines.length);
         if (dcentI.records.length < 2 || dcent.records.length < 2) {
-            throw new Error('The live monthly data file does not contain enough complete years.');
+            throw new Error('The live monthly data file does not contain enough monthly records.');
         }
 
         return [
@@ -338,35 +422,44 @@
         label.textContent = `${formatMonth(coverage.start)} – ${formatMonth(coverage.end)}`;
     }
 
-    function alignMonthlyToAnnualReference(datasets, annualOffset) {
+    function alignMonthlyToAnnualReference(datasets, annualOffset, annualReferenceDeltas) {
         if (!Number.isFinite(annualOffset)) {
             throw new Error('The annual alignment offset is unavailable.');
         }
 
         return datasets.map(dataset => {
-            const monthlyBaselines = MONTH_LABELS.map((_, monthIndex) => {
+            const productAnnualReferenceDelta = annualReferenceDeltas.get(dataset.key);
+            if (!Number.isFinite(productAnnualReferenceDelta)) {
+                throw new Error(`The annual ${dataset.label} reference difference is unavailable.`);
+            }
+            const preindustrialMonthlyBaselines = MONTH_LABELS.map((_, monthIndex) => {
                 const baselineValues = dataset.records
-                    .filter(record => record.year >= ALIGNMENT_START_YEAR && record.year <= ALIGNMENT_END_YEAR)
+                    .filter(record => record.year >= BASELINE_START_YEAR && record.year <= BASELINE_END_YEAR)
                     .map(record => record.months[monthIndex]);
-                const expectedLength = ALIGNMENT_END_YEAR - ALIGNMENT_START_YEAR + 1;
+                const expectedLength = BASELINE_END_YEAR - BASELINE_START_YEAR + 1;
                 if (baselineValues.length !== expectedLength || !baselineValues.every(Number.isFinite)) {
-                    throw new Error(`The monthly data do not contain a complete ${ALIGNMENT_START_YEAR}–${ALIGNMENT_END_YEAR} baseline.`);
+                    throw new Error(`The monthly ${dataset.label} data do not contain a complete ${BASELINE_START_YEAR}–${BASELINE_END_YEAR} baseline.`);
                 }
                 return baselineValues.reduce((sum, value) => sum + value, 0) / baselineValues.length;
             });
+            const productOffset = annualOffset - productAnnualReferenceDelta;
 
             return {
                 ...dataset,
                 records: dataset.records.map(record => ({
                     ...record,
-                    months: record.months.map((value, monthIndex) => value - monthlyBaselines[monthIndex] + annualOffset)
+                    months: record.months.map((value, monthIndex) => (
+                        Number.isFinite(value)
+                            ? value - preindustrialMonthlyBaselines[monthIndex] + productOffset
+                            : value
+                    ))
                 }))
             };
         });
     }
 
     function parseBerkeleySeries(text) {
-        const records = completedYears(text.replace(/\r/g, '').split('\n')
+        const records = text.replace(/\r/g, '').split('\n')
             .map(line => line.trim().split(/\s+/))
             .filter(values => /^\d{4}$/.test(values[0]) && Number.isFinite(Number.parseFloat(values[1])))
             .map(values => ({
@@ -374,7 +467,7 @@
                 value: Number.parseFloat(values[1]),
                 uncertainty: Number.parseFloat(values[2])
             }))
-            .filter(record => Number.isFinite(record.uncertainty)));
+            .filter(record => Number.isFinite(record.uncertainty));
 
         if (records.length < 2) throw new Error('Berkeley Earth did not provide enough annual records.');
 
@@ -385,14 +478,14 @@
     }
 
     function parseNoaaSeries(text) {
-        const records = completedYears(text.replace(/\r/g, '').split('\n')
+        const records = text.replace(/\r/g, '').split('\n')
             .map(line => line.trim().split(/\s+/))
             .filter(values => /^\d{4}$/.test(values[0]) && Number.isFinite(Number.parseFloat(values[1])))
             .map(values => ({
                 year: Number.parseInt(values[0], 10),
                 value: Number.parseFloat(values[1])
             }))
-            .filter(record => record.value > -90));
+            .filter(record => record.value > -90);
 
         if (records.length < 2) throw new Error('NOAA did not provide enough annual records.');
 
@@ -407,10 +500,10 @@
         const headerIndex = lines.findIndex(line => line.trim().startsWith('Time,'));
         if (headerIndex === -1) throw new Error('HadCRUT5 does not contain the expected annual-data header.');
 
-        const records = completedYears(lines.slice(headerIndex + 1)
+        const records = lines.slice(headerIndex + 1)
             .map(line => line.split(',').map(value => Number.parseFloat(value.trim())))
             .filter(values => values.length >= 4 && values.slice(0, 4).every(Number.isFinite))
-            .map(([year, value, lower, upper]) => ({ year, value, lower, upper })));
+            .map(([year, value, lower, upper]) => ({ year, value, lower, upper }));
 
         if (records.length < 2) throw new Error('HadCRUT5 did not provide enough annual records.');
 
@@ -421,13 +514,13 @@
     }
 
     function parseGissSeries(text) {
-        const records = completedYears(text.replace(/\r/g, '').split('\n')
+        const records = text.replace(/\r/g, '').split('\n')
             .map(line => line.trim().split(/\s+/))
             .filter(values => values.length >= 14 && /^\d{4}$/.test(values[0]) && Number.isFinite(Number.parseFloat(values[13])))
             .map(values => ({
                 year: Number.parseInt(values[0], 10),
                 value: Number.parseFloat(values[13]) / 100
-            })));
+            }));
 
         if (records.length < 2) throw new Error('NASA GISS did not provide enough annual records.');
 
@@ -901,10 +994,17 @@
         function lineForRecord(record, recordsByYear) {
             const previousRecord = recordsByYear.get(record.year - 1);
             const nextRecord = recordsByYear.get(record.year + 1);
+            const currentPoints = record.months
+                .map((value, index) => ({ month: index + 1, value }))
+                .filter(point => Number.isFinite(point.value));
             const points = [
-                ...(previousRecord ? [{ month: 0.5, value: previousRecord.months[11] }] : []),
-                ...record.months.map((value, index) => ({ month: index + 1, value })),
-                ...(nextRecord ? [{ month: 12.5, value: nextRecord.months[0] }] : [])
+                ...(previousRecord && currentPoints[0]?.month === 1 && Number.isFinite(previousRecord.months[11])
+                    ? [{ month: 0.5, value: previousRecord.months[11] }]
+                    : []),
+                ...currentPoints,
+                ...(nextRecord && currentPoints.at(-1)?.month === 12 && Number.isFinite(nextRecord.months[0])
+                    ? [{ month: 12.5, value: nextRecord.months[0] }]
+                    : [])
             ];
             return points.map((point, index) => (
                 `${index === 0 ? 'M' : 'L'} ${x(point.month).toFixed(2)} ${y(point.value).toFixed(2)}`
@@ -1105,12 +1205,15 @@
             const latestPointLayer = appendSvg(svg, 'g', { class: 'dashboard-monthly-point-layer' });
             const hoverPointLayer = appendSvg(svg, 'g', { class: 'dashboard-monthly-point-layer' });
             const latestRecord = dataset.records.find(record => record.year === latestYear);
-            latestRecord.months.forEach((value, monthIndex) => appendSvg(latestPointLayer, 'circle', {
-                class: 'dashboard-monthly-latest-point',
-                cx: x(monthIndex + 1),
-                cy: y(value),
-                r: 7
-            }));
+            latestRecord.months.forEach((value, monthIndex) => {
+                if (!Number.isFinite(value)) return;
+                appendSvg(latestPointLayer, 'circle', {
+                    class: 'dashboard-monthly-latest-point',
+                    cx: x(monthIndex + 1),
+                    cy: y(value),
+                    r: 7
+                });
+            });
 
             const tooltipWidth = 60;
             const tooltipHeight = 31;
@@ -1180,13 +1283,16 @@
                     lineLayer.appendChild(state.line);
                     latestPointLayer.style.opacity = state.record.year === latestYear ? '1' : '0';
                     hoverPointLayer.replaceChildren();
-                    state.record.months.forEach((value, monthIndex) => appendSvg(hoverPointLayer, 'circle', {
-                        class: 'dashboard-monthly-hover-point',
-                        cx: x(monthIndex + 1),
-                        cy: y(value),
-                        r: state.record.year === latestYear ? 7 : 5,
-                        style: `fill:${state.highlightColor}`
-                    }));
+                    state.record.months.forEach((value, monthIndex) => {
+                        if (!Number.isFinite(value)) return;
+                        appendSvg(hoverPointLayer, 'circle', {
+                            class: 'dashboard-monthly-hover-point',
+                            cx: x(monthIndex + 1),
+                            cy: y(value),
+                            r: state.record.year === latestYear ? 7 : 5,
+                            style: `fill:${state.highlightColor}`
+                        });
+                    });
                     const yearIndex = lastYear - state.record.year;
                     yearKeyHighlight.setAttribute('x', String(yearKeyX - 2));
                     yearKeyHighlight.setAttribute('y', String(yearKeyY + yearIndex * yearKeyStepHeight - 1));
@@ -1949,7 +2055,7 @@
         context.restore();
     }
 
-    function initialiseSpatialMap(host, initialState = {}, onStateChange) {
+    function initialiseSpatialMap(host, initialState = {}, onStateChange, mapUrls = SPATIAL_MAP_URLS) {
         const canvas = host.querySelector('.dashboard-spatial-map-canvas');
         const hoverCanvas = host.querySelector('.dashboard-spatial-map-hover-canvas');
         const hoverContext = hoverCanvas.getContext('2d');
@@ -1975,11 +2081,11 @@
         let product = initialState.product === 'dcent' ? 'dcent' : 'dcentI';
         let metric = initialState.metric === 'rank' ? 'rank' : 'signal';
         let annualIndex = Number.isInteger(initialState.annualIndex)
-            ? Math.max(0, Math.min(SPATIAL_MAP_URLS[product].annuals.length - 1, initialState.annualIndex))
-            : SPATIAL_MAP_URLS[product].annuals.length - 1;
+            ? Math.max(0, Math.min(mapUrls[product].annuals.length - 1, initialState.annualIndex))
+            : mapUrls[product].annuals.length - 1;
         let monthIndex = Number.isInteger(initialState.monthIndex)
-            ? Math.max(0, Math.min(SPATIAL_MAP_URLS[product].months.length - 1, initialState.monthIndex))
-            : SPATIAL_MAP_URLS[product].months.length - 1;
+            ? Math.max(0, Math.min(mapUrls[product].months.length - 1, initialState.monthIndex))
+            : mapUrls[product].months.length - 1;
         let centralLongitude = Number.isFinite(initialState.centralLongitude)
             ? normaliseCentralLongitude(initialState.centralLongitude)
             : 180;
@@ -2003,8 +2109,8 @@
 
         function currentUrl() {
             return timeMode === 'annual'
-                ? SPATIAL_MAP_URLS[product].annuals[annualIndex]
-                : SPATIAL_MAP_URLS[product].months[monthIndex];
+                ? mapUrls[product].annuals[annualIndex]
+                : mapUrls[product].months[monthIndex];
         }
 
         function currentKey() {
@@ -2092,8 +2198,8 @@
             monthNavigation.hidden = false;
             const periodIndex = timeMode === 'annual' ? annualIndex : monthIndex;
             const periodCount = timeMode === 'annual'
-                ? SPATIAL_MAP_URLS[product].annuals.length
-                : SPATIAL_MAP_URLS[product].months.length;
+                ? mapUrls[product].annuals.length
+                : mapUrls[product].months.length;
             previousMonth.disabled = periodIndex === 0;
             nextMonth.disabled = periodIndex === periodCount - 1;
             monthNavigation.setAttribute('aria-label', timeMode === 'annual' ? 'Browse annual maps' : 'Browse recent monthly maps');
@@ -2183,7 +2289,7 @@
             if (index < 0) return Promise.resolve();
             return loadFrameFor(
                 `${productKey}:monthly:${index}`,
-                SPATIAL_MAP_URLS[productKey].months[index]
+                mapUrls[productKey].months[index]
             ).catch(error => {
                 console.warn('Unable to preload a spatial monthly map:', error);
             });
@@ -2193,7 +2299,7 @@
             if (index < 0) return Promise.resolve();
             return loadFrameFor(
                 `${productKey}:annual:${index}`,
-                SPATIAL_MAP_URLS[productKey].annuals[index]
+                mapUrls[productKey].annuals[index]
             ).catch(error => {
                 console.warn('Unable to preload a spatial annual map:', error);
             });
@@ -2244,8 +2350,8 @@
             const nextProduct = button.dataset.spatialProduct;
             if (nextProduct === product) return;
             product = nextProduct;
-            annualIndex = Math.min(annualIndex, SPATIAL_MAP_URLS[product].annuals.length - 1);
-            monthIndex = Math.min(monthIndex, SPATIAL_MAP_URLS[product].months.length - 1);
+            annualIndex = Math.min(annualIndex, mapUrls[product].annuals.length - 1);
+            monthIndex = Math.min(monthIndex, mapUrls[product].months.length - 1);
             saveState();
             refresh();
         }));
@@ -2269,10 +2375,10 @@
         });
         nextMonth.addEventListener('click', () => {
             if (timeMode === 'annual') {
-                if (annualIndex === SPATIAL_MAP_URLS[product].annuals.length - 1) return;
+                if (annualIndex === mapUrls[product].annuals.length - 1) return;
                 annualIndex += 1;
             } else {
-                if (monthIndex === SPATIAL_MAP_URLS[product].months.length - 1) return;
+                if (monthIndex === mapUrls[product].months.length - 1) return;
                 monthIndex += 1;
             }
             saveState();
@@ -2347,7 +2453,7 @@
                     });
             },
             preloadLatestMonth() {
-                return preloadMonth(product, SPATIAL_MAP_URLS[product].months.length - 1);
+                return preloadMonth(product, mapUrls[product].months.length - 1);
             }
         };
     }
@@ -2425,6 +2531,8 @@
         const content = document.querySelector('#dashboard .dashboard-content');
         if (!content || content.dataset.initialized === 'true') return;
 
+        const dcentGmstDataUrls = dcentGmstDataUrlsForSelectedAccess();
+        const spatialMapUrls = spatialMapUrlsForSelectedAccess();
         const dashboardState = readDashboardSessionState();
         function saveDashboardState(changes) {
             Object.assign(dashboardState, changes);
@@ -2536,19 +2644,41 @@
 
         const chartHost = content.querySelector('.dashboard-chart:not(.dashboard-monthly-chart)');
         const monthlyChartHost = content.querySelector('.dashboard-monthly-chart');
+        const annualSubtitle = content.querySelector('.dashboard-panel-subtitle');
         const monthlySubtitle = content.querySelector('[data-monthly-subtitle]');
         const stripeChartHost = content.querySelector('.dashboard-stripe-chart');
         const spatialMap = initialiseSpatialMap(
             content.querySelector('.dashboard-spatial-map'),
             dashboardState.spatialMap,
-            spatialMapState => saveDashboardState({ spatialMap: spatialMapState })
+            spatialMapState => saveDashboardState({ spatialMap: spatialMapState }),
+            spatialMapUrls
         );
         const monthlyProductButtons = [...content.querySelectorAll('[data-monthly-product]')];
         let annualCommonOffset;
+        let annualProductReferenceDeltas;
         let monthlyRawDatasets;
         let monthlyDatasets;
         let monthlyChart;
+        let currentAnnualRanking;
         let selectedMonthlyProduct = dashboardState.monthlyProduct === 'dcent' ? 'dcent' : 'dcentI';
+
+        function updateAnnualSubtitle() {
+            if (!currentAnnualRanking) return;
+
+            const coverage = monthlyRawDatasets
+                ?.find(dataset => dataset.key === 'dcentI')
+                ?.coverage;
+            const isProvisional = (
+                coverage
+                && coverage.end.year === currentAnnualRanking.year
+                && coverage.end.monthIndex < 11
+            );
+            const prefix = isProvisional ? 'Provisional, ' : '';
+            annualSubtitle.innerHTML = `${prefix}${rankingSubtitle(currentAnnualRanking)}`.replace(
+                ordinal(currentAnnualRanking.rank),
+                `<span class="dashboard-panel-rank">${ordinal(currentAnnualRanking.rank)}</span>`
+            );
+        }
 
         function setMonthlyProduct(key) {
             if (!monthlyChart) return;
@@ -2565,9 +2695,13 @@
         }
 
         function renderMonthlyWhenReady() {
-            if (!monthlyRawDatasets || !Number.isFinite(annualCommonOffset)) return;
+            if (!monthlyRawDatasets || !Number.isFinite(annualCommonOffset) || !annualProductReferenceDeltas) return;
             monthlyChartHost.removeAttribute('role');
-            monthlyDatasets = alignMonthlyToAnnualReference(monthlyRawDatasets, annualCommonOffset);
+            monthlyDatasets = alignMonthlyToAnnualReference(
+                monthlyRawDatasets,
+                annualCommonOffset,
+                annualProductReferenceDeltas
+            );
             monthlyChart = renderMonthlyChart(
                 monthlyChartHost,
                 monthlyDatasets
@@ -2586,7 +2720,7 @@
             }
         }, dashboardState.activeSlide);
         const annualDataRequest = Promise.allSettled([
-            fetchLiveText(DCENT_LIVE_DATA_URL).then(parseDcentSeries),
+            fetchLiveText(dcentGmstDataUrls.annual).then(parseDcentSeries),
             fetchLiveText(BERKELEY_LIVE_DATA_URL).then(parseBerkeleySeries),
             fetchLiveText(NOAA_LIVE_DATA_URL).then(parseNoaaSeries),
             fetchLiveText(HADCRUT_LOCAL_DATA_URL).then(parseHadcrutSeries),
@@ -2620,14 +2754,17 @@
 
                 const annualAlignment = alignToCommonPreindustrialReference(series);
                 annualCommonOffset = annualAlignment.commonOffset;
+                annualProductReferenceDeltas = new Map(dcentResult.value.map(item => [
+                    item.key,
+                    item.annualReferenceDelta
+                ]));
                 chartHost.removeAttribute('role');
-                const subtitle = content.querySelector('.dashboard-panel-subtitle');
                 renderChart(chartHost, annualAlignment.series, activeSeries => {
-                    const ranking = latestYearRanking(activeSeries.records, activeSeries.label);
-                    subtitle.innerHTML = rankingSubtitle(ranking).replace(
-                        ordinal(ranking.rank),
-                        `<span class="dashboard-panel-rank">${ordinal(ranking.rank)}</span>`
+                    currentAnnualRanking = latestYearRanking(
+                        activeSeries.records,
+                        activeSeries.label
                     );
+                    updateAnnualSubtitle();
                 });
                 const dcentIStripes = annualAlignment.series.find(item => item.key === 'dcentI');
                 stripeChartHost.removeAttribute('role');
@@ -2648,11 +2785,12 @@
                 console.error('Unable to load annual GMST data:', error);
             });
 
-        const monthlyDataRequest = fetchLiveText(DCENT_MONTHLY_LIVE_DATA_URL)
+        const monthlyDataRequest = fetchLiveText(dcentGmstDataUrls.monthly)
             .then(parseMonthlyDcentSeries)
             .then(datasets => {
                 monthlyRawDatasets = datasets;
                 updateSidebarCoverage(datasets);
+                updateAnnualSubtitle();
                 renderMonthlyWhenReady();
             })
             .catch(error => {
