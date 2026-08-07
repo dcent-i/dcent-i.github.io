@@ -2466,47 +2466,72 @@
         const dots = [...carousel.querySelectorAll('[data-carousel-slide]')];
         let activeIndex = Math.max(0, Math.min(slides.length - 1, Number.isInteger(initialIndex) ? initialIndex : 0));
         let reportedIndex;
-        let scrollFrame;
+        let updateFrame;
 
-        function goTo(index) {
-            const targetIndex = Math.max(0, Math.min(index, slides.length - 1));
-            viewport.scrollTo({ left: slides[targetIndex].offsetLeft, behavior: 'smooth' });
-        }
-
-        function updateActive() {
-            const viewportCentre = viewport.scrollLeft + viewport.clientWidth / 2;
-            let nearestIndex = 0;
-            let nearestDistance = Infinity;
-
-            slides.forEach((slide, index) => {
-                const slideCentre = slide.offsetLeft + slide.offsetWidth / 2;
-                const distance = Math.abs(slideCentre - viewportCentre);
-                if (distance < nearestDistance) {
-                    nearestDistance = distance;
-                    nearestIndex = index;
-                }
-            });
-
-            activeIndex = nearestIndex;
+        function setActiveIndex(index) {
+            activeIndex = Math.max(0, Math.min(slides.length - 1, index));
             previous.disabled = activeIndex === 0;
             next.disabled = activeIndex === slides.length - 1;
-            dots.forEach((dot, index) => dot.setAttribute('aria-current', String(index === activeIndex)));
+            dots.forEach((dot, dotIndex) => dot.setAttribute('aria-current', String(dotIndex === activeIndex)));
             if (activeIndex !== reportedIndex) {
                 reportedIndex = activeIndex;
                 onActiveChange?.(activeIndex);
             }
         }
 
+        function slideScrollPosition(slide) {
+            const viewportLeft = viewport.getBoundingClientRect().left;
+            const slideLeft = slide.getBoundingClientRect().left;
+            return viewport.scrollLeft + slideLeft - viewportLeft;
+        }
+
+        function goTo(index) {
+            const targetIndex = Math.max(0, Math.min(index, slides.length - 1));
+            viewport.scrollTo({ left: slideScrollPosition(slides[targetIndex]), behavior: 'smooth' });
+        }
+
+        function mostVisibleSlideIndex() {
+            const viewportBounds = viewport.getBoundingClientRect();
+            let mostVisibleIndex = activeIndex;
+            let largestVisibleWidth = -1;
+
+            slides.forEach((slide, index) => {
+                const slideBounds = slide.getBoundingClientRect();
+                const visibleWidth = Math.max(
+                    0,
+                    Math.min(slideBounds.right, viewportBounds.right)
+                        - Math.max(slideBounds.left, viewportBounds.left)
+                );
+                if (visibleWidth > largestVisibleWidth) {
+                    largestVisibleWidth = visibleWidth;
+                    mostVisibleIndex = index;
+                }
+            });
+
+            return mostVisibleIndex;
+        }
+
+        function updateActive() {
+            setActiveIndex(mostVisibleSlideIndex());
+        }
+
+        function scheduleActiveUpdate() {
+            if (updateFrame) return;
+            updateFrame = requestAnimationFrame(() => {
+                updateActive();
+                updateFrame = undefined;
+            });
+        }
+
         previous.addEventListener('click', () => goTo(activeIndex - 1));
         next.addEventListener('click', () => goTo(activeIndex + 1));
         dots.forEach((dot, index) => dot.addEventListener('click', () => goTo(index)));
-        viewport.addEventListener('scroll', () => {
-            if (scrollFrame) return;
-            scrollFrame = requestAnimationFrame(() => {
-                updateActive();
-                scrollFrame = undefined;
-            });
-        }, { passive: true });
+        viewport.addEventListener('scroll', scheduleActiveUpdate, { passive: true });
+        viewport.addEventListener('scrollend', updateActive);
+        window.addEventListener('resize', scheduleActiveUpdate);
+        if (typeof ResizeObserver === 'function') {
+            new ResizeObserver(scheduleActiveUpdate).observe(viewport);
+        }
         viewport.addEventListener('keydown', event => {
             if (event.key === 'ArrowRight') {
                 event.preventDefault();
@@ -2523,7 +2548,7 @@
             }
         });
 
-        if (activeIndex > 0) viewport.scrollLeft = slides[activeIndex].offsetLeft;
+        if (activeIndex > 0) viewport.scrollLeft = slideScrollPosition(slides[activeIndex]);
         updateActive();
     }
 
