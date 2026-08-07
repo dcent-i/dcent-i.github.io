@@ -38,6 +38,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const file = el.getAttribute('include-html');
         
         if (file) {
+            // Keep the selected include available to other page modules after
+            // the include-html attribute has been removed below.
+            el.dataset.includeSource = file;
             const includeLoad = fetch(file)
             .then(response => {
                 if (response.ok) return response.text();
