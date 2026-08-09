@@ -1,0 +1,1861 @@
+<article class="version-update" data-version-update>
+  <button class="version-update-card" type="button" data-version-update-open>
+    <span class="version-update-card-header">
+      <span class="version-update-release">
+        <span class="version-update-product">DCENT</span>
+        <span class="version-update-version">v1.1.0.0</span>
+      </span>
+      <span class="version-update-release">
+        <span class="version-update-product">DCENT-I</span>
+        <span class="version-update-version">v1.1.1.0</span>
+      </span>
+    </span>
+    <span class="version-update-summary">
+      Joint DCENT and DCENT-I release. Add a concise summary of the shared changes in this update.
+    </span>
+    <span class="version-update-read-more">Read the full update →</span>
+  </button>
+
+  <div class="version-update-article" data-version-update-article hidden>
+    <p class="version-update-article-eyebrow">DCENT v1.1.0.0 · DCENT-I v1.1.1.0</p>
+    <h2>[2026/08/10] Release Update</h2>
+
+    <p>
+      <b>For ICOADS SST measurements from 1982 onward, DCENT v1.1.0.0 applies an additional quality-control
+      check that makes use of information from the satellite era.</b>
+    </p>
+
+    <p>
+      Specifically, same-day OISST v2.1 fields
+      are used as a common reference for identifying in-situ measurements with exceptionally large discrepancies.
+      Although OISST v2.1 is not a purely satellite-based product, it is available with rapid daily updates,
+      making it more suitable for this purpose than products such as ESA CCI, which are updated less frequently.
+      The purpose of this comparison is not to treat OISST v2.1 as ground truth, but to exclude extreme
+      discrepancies that are likely to reflect poor-quality in-situ measurements and thereby improve the
+      consistency of measurements going into DCENT(-I).
+    </p>
+
+    <h3>Methods</h3>
+
+    <p>
+      Outlier SST measurements are identified using the median absolute deviation (MAD), rather than
+      the mean and standard deviation, because the measurement differences are strongly non-Gaussian
+      and may contain extreme values.
+    </p>
+
+    <p style="margin:1.2rem 0;text-align:center;">
+      <i>MAD</i> = median(|<i>x</i><sub>i</sub>|)
+    </p>
+
+    <p>
+      where <i>x</i><sub>i</sub> is the difference between in-situ and satellite measurements. The
+      robust scale estimate is:
+    </p>
+
+    <p style="margin:1.2rem 0;text-align:center;">
+      σ̂<sub>MAD</sub> = 1.4826 × <i>MAD</i>
+    </p>
+
+    <p>The scaling factor is derived from the standard normal distribution:</p>
+
+    <p style="margin:1.2rem 0;text-align:center;">
+      1.4826 = 1 / Φ<sup>−1</sup>(0.75)
+    </p>
+
+    <p>
+      The median absolute deviation was preferred over higher quantiles because it is less sensitive
+      to contamination by outliers.
+      This procedure assumes that the differences between the in-situ and satellite measurements are
+      centered on zero.
+    </p>
+
+    <p>
+      The robust scale estimates were calculated separately for ship and buoy measurements for each
+      calendar month and each 5° grid cell. For each grid cell–month combination, all collocated
+      in-situ and satellite differences from 1982–2025 were pooled to estimate a single value of
+      σ̂<sub>MAD</sub>. The resulting scale estimates are typically around 1.0–1.5°C for ship
+      measurements and 0.2–0.4°C for buoy measurements.
+    </p>
+
+    <figure class="dcent-sigma-map" data-dcent-sigma-map>
+      <figcaption class="dcent-sigma-map__header">
+        <span class="dcent-sigma-map__title">January σ̂<sub>MAD</sub></span>
+      </figcaption>
+      <div class="dcent-sigma-map__canvas-wrap">
+        <canvas class="dcent-sigma-map__canvas" aria-label="Map of January robust-scale estimates"></canvas>
+        <span class="dcent-sigma-map__status" aria-live="polite">Loading January estimates…</span>
+      </div>
+      <div class="dcent-sigma-map__legend" aria-label="Colour scale">
+        <span>0</span>
+        <span class="dcent-sigma-map__gradient"></span>
+        <span data-dcent-sigma-limit>3°C</span>
+      </div>
+      <div class="dcent-sigma-map__controls" aria-label="Observation platform">
+        <button class="dcent-sigma-map__control" type="button" data-dcent-sigma-platform="ship" aria-pressed="true">Ship</button>
+        <button class="dcent-sigma-map__control" type="button" data-dcent-sigma-platform="buoy" aria-pressed="false">Buoy</button>
+      </div>
+    </figure>
+
+    <p>Values are flagged as potential outliers when:</p>
+
+    <p style="margin:1.2rem 0;text-align:center;">
+      |<i>x</i><sub>i</sub>| &gt; <i>k</i>σ̂<sub>MAD</sub>
+    </p>
+
+    <p>
+      where <i>k</i> = 2.58 for ship measurements and <i>k</i> = 3.29 for buoy measurements. These
+      values correspond to nominal two-sided Gaussian equivalent coverage levels of 99% and 99.9%,
+      respectively. The larger multiplier for buoy measurements provides a more conservative
+      operational threshold, reducing the risk of rejecting otherwise reliable buoy observations.
+    </p>
+
+    <p>
+      An additional platform-level check was applied after the individual observation check. Within
+      each processing month, observations sharing the same platform identifiers were grouped
+      together, and the median in-situ–satellite difference was calculated using only observations
+      that passed the preceding individual-level check. The median, <i>M</i><sub>p</sub>, was then
+      used to reduce the influence of any remaining extreme differences.
+    </p>
+
+    <p style="margin:1.2rem 0;text-align:center;">
+      |<i>M</i><sub>p</sub>| &gt; <i>k</i>σ<sub>p</sub>
+    </p>
+
+    <p>
+      All observations associated with a platform were rejected when this condition was met, where
+      σ<sub>p</sub> = 0.71°C and <i>k</i> = 2.58 for ships, and σ<sub>p</sub> = 0.29°C and
+      <i>k</i> = 3.29 for buoys. The σ<sub>p</sub> values were adopted from Kennedy et al. (2012).
+      This additional step is intended to identify platforms exhibiting a persistent systematic
+      discrepancy from the satellite reference, even when some individual observations are not
+      sufficiently extreme to be rejected separately.
+    </p>
+
+    <h3>Results</h3>
+
+    <p> 
+      The effect of this quality-control procedure is illustrated below using ICOADS SST measurements 
+      from June 2026, shown before and after the additional OISST-based checks. The additional quality 
+      control removes clearly anomalous ship-track features, including excessively warm measurements in 
+      the southern Indian Ocean and excessively cold measurements in the Pacific warm pool. After gridding, 
+      this reduces isolated warm and cold artifacts and produces a spatially more coherent SST anomaly field.
+    </p>
+
+    <figure class="dcent-sigma-map dcent-qc-map" data-dcent-qc-map>
+      <figcaption class="dcent-sigma-map__header">
+        <span class="dcent-sigma-map__title" data-dcent-qc-title>Observations failing the additional QC, June 2026</span>
+      </figcaption>
+      <div class="dcent-sigma-map__canvas-wrap">
+        <canvas class="dcent-sigma-map__canvas" aria-label="Map of the June 2026 additional quality-control results"></canvas>
+        <span class="dcent-sigma-map__status" aria-live="polite">Loading June 2026 quality-control results…</span>
+      </div>
+      <div class="dcent-sigma-map__legend" aria-label="SST anomaly colour scale">
+        <span data-dcent-qc-anomaly-min>−5°C</span>
+        <span class="dcent-sigma-map__gradient dcent-qc-map__gradient"></span>
+        <span data-dcent-qc-anomaly-max>5°C</span>
+      </div>
+      <div class="dcent-qc-map__legend-label">SST anomalies (°C)</div>
+      <div class="dcent-qc-map__marker-legend" data-dcent-qc-marker-legend aria-label="Observation platform markers">
+        <span><b>●</b> Ship</span>
+        <span><b>◆</b> Buoy</span>
+      </div>
+      <div class="dcent-sigma-map__controls" aria-label="June 2026 quality-control map">
+        <button class="dcent-sigma-map__control" type="button" data-dcent-qc-mode="failed" aria-pressed="true">Failed QC</button>
+        <button class="dcent-sigma-map__control" type="button" data-dcent-qc-mode="before" aria-pressed="false">Without QC</button>
+        <button class="dcent-sigma-map__control" type="button" data-dcent-qc-mode="after" aria-pressed="false">With QC</button>
+      </div>
+    </figure>
+
+    <p> 
+      Overall, the additional OISST-based quality control is relatively selective for ship and buoy observations. 
+      Across 1982–2025, approximately 93% of ship and 96% of buoy measurements that passed the preceding quality-control 
+      procedures are retained after the additional checks. The corresponding retention rate is substantially lower for 
+      CMAN observations, only at approximately 60%. This larger reduction primarily reflects the platform-level check, 
+      which removes all observations from CMAN stations exhibiting persistent systematic discrepancies from the OISST reference.
+    </p>
+
+    <p> 
+      The relatively large fraction of rejected CMAN measurements are not expected totranslate into a comparably large effect 
+      on the gridded open-ocean SST fields. CMAN observations are collected at fixed, high-frequency stations 
+      concentrated along the U.S. coast, so individual stations can contribute large numbers of measurements while 
+      representing only a limited spatial area.
+    </p>
+
+    <figure class="dcent-qc-stats" data-dcent-qc-stats>
+      <figcaption class="dcent-qc-stats__title">Measurements passing QC and entering DCENT</figcaption>
+      <div class="dcent-qc-stats__canvas-wrap">
+        <canvas class="dcent-qc-stats__canvas" aria-label="Annual measurements passing quality control and entering DCENT"></canvas>
+        <span class="dcent-qc-stats__status" aria-live="polite">Loading annual measurement counts…</span>
+      </div>
+      <div class="dcent-qc-stats__legend" aria-label="Measurement platform">
+        <span><i class="dcent-qc-stats__swatch dcent-qc-stats__swatch--ship"></i>Ship</span>
+        <span><i class="dcent-qc-stats__swatch dcent-qc-stats__swatch--buoy"></i>Buoy</span>
+        <span><i class="dcent-qc-stats__swatch dcent-qc-stats__swatch--cman"></i>CMAN*</span>
+        <span class="dcent-qc-stats__legend-divider" aria-hidden="true"></span>
+        <span><i class="dcent-qc-stats__bar-key dcent-qc-stats__bar-key--with"></i>Passes new QC</span>
+        <span><i class="dcent-qc-stats__bar-key dcent-qc-stats__bar-key--without"></i>Fails additional QC</span>
+      </div>
+      <div class="dcent-sigma-map__controls" aria-label="Measurement chart view">
+        <button class="dcent-sigma-map__control" type="button" data-dcent-qc-stats-view="count" aria-pressed="true"># of measurements</button>
+        <button class="dcent-sigma-map__control" type="button" data-dcent-qc-stats-view="percentage" aria-pressed="false">Percentage</button>
+      </div>
+      <p class="dcent-qc-stats__note">* CMAN denotes Coastal-Marine Automated Network observations; they are processed using the buoy criteria.</p>
+    </figure>
+
+    <h3>Implications for DCENT and DCENT-I</h3>
+
+    <p>
+      The implications of the additional QC step were assessed by comparing global SST estimates with and without its application. 
+      For DCENT SST, the 1982–2025 warming trend increases from 0.145 to 0.158°C per decade, a difference of 0.012°C per decade. 
+    </p>
+
+    <p> 
+      This difference reflects both the removal of genuinely anomalous measurements and any potential influence associated with 
+      the choice of OISST v2.1 as the reference.  The latter is of particular interest because Menemenlis et al. (2025) reported 
+      that OISST v2.1's 1982–2024 warming trend is approximately 0.03–0.05°C per decade larger than those of COBE2 and ERSST v5.  
+      Nevertheless, the 0.012°C per decade change associated with the additional QC is substantially smaller than 
+      these inter-product trend differences.
+    </p>
+
+    <figure class="dcent-qc-temperature" data-dcent-qc-temperature>
+      <figcaption class="dcent-qc-temperature__title" data-dcent-qc-temperature-title>DCENT global SST anomaly</figcaption>
+      <div class="dcent-qc-temperature__canvas-wrap">
+        <canvas class="dcent-qc-temperature__canvas" aria-label="Annual global temperature anomalies before and after the additional quality-control step"></canvas>
+        <span class="dcent-qc-temperature__status" aria-live="polite">Loading annual temperature statistics…</span>
+      </div>
+      <div class="dcent-qc-temperature__legend" aria-label="Quality-control version">
+        <span><i class="dcent-qc-temperature__line-key dcent-qc-temperature__line-key--with"></i>With new QC</span>
+        <span><i class="dcent-qc-temperature__line-key dcent-qc-temperature__line-key--without"></i>Without new QC</span>
+        <span><i class="dcent-qc-temperature__line-key dcent-qc-temperature__line-key--difference"></i>Δ (With − Without)</span>
+      </div>
+      <p class="dcent-qc-temperature__note">Shading shows the supplied uncertainty.</p>
+      <div class="dcent-sigma-map__controls" aria-label="Temperature series">
+        <button class="dcent-sigma-map__control" type="button" data-dcent-qc-temperature-view="sst" aria-pressed="true">DCENT SST</button>
+        <button class="dcent-sigma-map__control" type="button" data-dcent-qc-temperature-view="dcentISst" aria-pressed="false">DCENT-I SST</button>
+        <button class="dcent-sigma-map__control" type="button" data-dcent-qc-temperature-view="dcentI" aria-pressed="false">DCENT-I GMST</button>
+      </div>
+    </figure>
+
+    <p> 
+      Infilling further reduces the difference between estimates with and without the additional QC. 
+      For DCENT-I SST, the trend difference decreases to 0.005°C per decade. The reduction from 0.012 to 0.005°C per decade
+      is consistent with a substantial part of the original difference arising from localized anomalous grid cells 
+      that are suppressed by the infilling procedure.  The remaining difference provides a conservative measure of 
+      the residual sensitivity to the QC, including any potential dependence on the OISST v2.1 reference.
+    </p>
+
+    <p>
+      The corresponding impact on global mean surface temperature is smaller still. 
+      The 1982–2025 DCENT-I GMST trend increases from 0.217 to 0.221°C per decade when the additional QC is applied, 
+      a difference of 0.004°C decade⁻¹, or about <b>1.9%</b> of the estimated warming rate. 
+      This change is also small relative to the ensemble uncertainty in the DCENT-I trend (95% CI: 0.210–0.225°C per decade).
+    </p>
+
+    <p>
+      <b> 
+        Thus, although some dependence on the OISST v2.1 reference cannot be excluded, 
+        its potential influence on the final DCENT-I estimate of global warming is limited.
+      </b>
+    </p>
+
+  </div>
+</article>
+
+<style>
+  .version-update-article .dcent-sigma-map {
+    width: 100%;
+    margin: 1.55rem 0 1.7rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .dcent-sigma-map__header {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    margin-bottom: 0.45rem;
+    text-align: center;
+  }
+  .dcent-sigma-map__title {
+    color: #193e87;
+    font-size: 0.96rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+  .dcent-sigma-map__canvas-wrap {
+    position: relative;
+    width: 100%;
+  }
+  .dcent-sigma-map__canvas {
+    display: block;
+    width: 100%;
+    height: clamp(13.5rem, 34vw, 19rem);
+    cursor: grab;
+    touch-action: none;
+  }
+  .dcent-sigma-map__canvas.is-dragging { cursor: grabbing; }
+  .dcent-sigma-map__status {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    color: #52657e;
+    font-size: 0.82rem;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.78);
+  }
+  .dcent-sigma-map__status[hidden] { display: none; }
+  .dcent-sigma-map__legend {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    margin: 0.5rem auto 0.62rem;
+    color: #52657e;
+    font-size: 0.73rem;
+    line-height: 1;
+  }
+  .dcent-sigma-map__gradient {
+    width: min(19rem, 46vw);
+    height: 0.55rem;
+    border: 1px solid rgba(25, 62, 135, 0.22);
+    background: linear-gradient(90deg, #f7fbff 0%, #d6edf2 26%, #91c8d9 51%, #4d8cad 76%, #1c4c78 100%);
+  }
+  .dcent-qc-map__gradient {
+    background: linear-gradient(90deg, #231db8 0%, #4888de 22%, #a9dbe0 38%, #f6f8ee 50%, #f4c898 63%, #d76f69 80%, #681415 100%);
+  }
+  .dcent-qc-map__legend-label {
+    margin: -0.28rem 0 0.52rem;
+    color: #52657e;
+    font-size: 0.73rem;
+    line-height: 1;
+    text-align: center;
+  }
+  .dcent-qc-map__marker-legend {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin: -0.15rem 0 0.62rem;
+    color: #52657e;
+    font-size: 0.73rem;
+    line-height: 1;
+  }
+  .dcent-qc-map__marker-legend b {
+    color: #193e87;
+    font-size: 0.9rem;
+  }
+  .dcent-qc-map__marker-legend.is-placeholder { visibility: hidden; }
+  .version-update-article .dcent-qc-stats {
+    --dcent-qc-stats-ship: #193e87;
+    --dcent-qc-stats-buoy: #3491bf;
+    --dcent-qc-stats-cman: #e49036;
+    width: 100%;
+    margin: 2rem 0 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .dcent-qc-stats__title {
+    display: block;
+    margin-bottom: 0.45rem;
+    color: #193e87;
+    font-size: 0.96rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    text-align: center;
+  }
+  .dcent-qc-stats__canvas-wrap {
+    position: relative;
+    width: 100%;
+  }
+  .dcent-qc-stats__canvas {
+    display: block;
+    width: 100%;
+    height: clamp(15rem, 37vw, 21rem);
+  }
+  .dcent-qc-stats__status {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    color: #52657e;
+    font-size: 0.82rem;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.78);
+  }
+  .dcent-qc-stats__status[hidden] { display: none; }
+  .dcent-qc-stats__legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem 0.85rem;
+    margin: 0.58rem auto 0;
+    color: #52657e;
+    font-size: 0.73rem;
+    line-height: 1;
+  }
+  .dcent-qc-stats__legend-divider {
+    width: 1px;
+    height: 0.82rem;
+    margin: 0 0.05rem;
+    background: #9baabf;
+  }
+  .dcent-qc-stats__swatch,
+  .dcent-qc-stats__bar-key {
+    display: inline-block;
+    width: 0.72rem;
+    height: 0.72rem;
+    margin-right: 0.25rem;
+    vertical-align: -0.12rem;
+  }
+  .dcent-qc-stats__swatch--ship { background: var(--dcent-qc-stats-ship); }
+  .dcent-qc-stats__swatch--buoy { background: var(--dcent-qc-stats-buoy); }
+  .dcent-qc-stats__swatch--cman { background: var(--dcent-qc-stats-cman); }
+  .dcent-qc-stats__bar-key--with { background: #72839b; }
+  .dcent-qc-stats__bar-key--without {
+    background: rgba(114, 131, 155, 0.38);
+  }
+  .dcent-qc-stats .dcent-sigma-map__controls { margin-top: 0.72rem; }
+  .dcent-qc-stats__note {
+    margin: 0.62rem 0 0;
+    color: #52657e;
+    font-size: 0.76rem;
+    font-style: italic;
+    line-height: 1.4;
+    text-align: center;
+  }
+  .version-update-article .dcent-qc-temperature {
+    --dcent-qc-temperature-with: #193e87;
+    --dcent-qc-temperature-without: #c9344f;
+    --dcent-qc-temperature-difference: #afb1b3;
+    width: 100%;
+    margin: 2rem 0 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .dcent-qc-temperature__title {
+    display: block;
+    margin-bottom: 0.45rem;
+    color: #193e87;
+    font-size: 0.96rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    text-align: center;
+  }
+  .dcent-qc-temperature__canvas-wrap {
+    position: relative;
+    width: 100%;
+  }
+  .dcent-qc-temperature__canvas {
+    display: block;
+    width: 100%;
+    height: clamp(15rem, 37vw, 21rem);
+  }
+  .dcent-qc-temperature__status {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    color: #52657e;
+    font-size: 0.82rem;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.78);
+  }
+  .dcent-qc-temperature__status[hidden] { display: none; }
+  .dcent-qc-temperature__legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem 1rem;
+    margin: 0.58rem auto 0;
+    color: #52657e;
+    font-size: 0.73rem;
+    line-height: 1;
+  }
+  .dcent-qc-temperature__line-key {
+    display: inline-block;
+    width: 1.15rem;
+    height: 0;
+    margin-right: 0.25rem;
+    border-top: 2px solid;
+    vertical-align: 0.18rem;
+  }
+  .dcent-qc-temperature__line-key--with { border-color: var(--dcent-qc-temperature-with); }
+  .dcent-qc-temperature__line-key--without {
+    border-color: var(--dcent-qc-temperature-without);
+    border-top-style: dashed;
+  }
+  .dcent-qc-temperature__line-key--difference {
+    border-color: var(--dcent-qc-temperature-difference);
+  }
+  .dcent-qc-temperature__note {
+    margin: 0.42rem 0 0;
+    color: #52657e;
+    font-size: 0.76rem;
+    font-style: italic;
+    line-height: 1.4;
+    text-align: center;
+  }
+  .dcent-qc-temperature .dcent-sigma-map__controls { margin-top: 0.72rem; }
+  .dcent-sigma-map__controls {
+    display: flex;
+    justify-content: center;
+    gap: 0.45rem;
+  }
+  .dcent-sigma-map__control {
+    appearance: none;
+    border: 1px solid #a8b8ce;
+    border-radius: 999px;
+    background: #fff;
+    color: #31517a;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.77rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.3rem 0.78rem;
+    transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+  }
+  .dcent-sigma-map__control:hover { border-color: #5478ad; background: #edf5fb; }
+  .dcent-sigma-map__control[aria-pressed="true"] {
+    border-color: #193e87;
+    background: #193e87;
+    color: #fff;
+  }
+  @media (max-width: 480px) {
+    .dcent-sigma-map__gradient { width: 40vw; }
+  }
+</style>
+
+<script data-version-update-script>
+  (() => {
+    const LONGITUDES = 72;
+    const LATITUDES = 36;
+    const CENTRAL_LONGITUDE = 180;
+    const FILES = {
+      ship: "data/DCENT_v1.1.0.0_sigma_ship_jan.txt",
+      buoy: "data/DCENT_v1.1.0.0_sigma_buoy_jan.txt",
+      before: "data/DCENT_v1.1.0.0_202606_before.txt",
+      after: "data/DCENT_v1.1.0.0_202606_after.txt"
+    };
+    const QC_POINTS_URL = "data/DCENT_v1.1.0.0_202606_qc.txt";
+    const QC_STATS_URL = "data/DCENT_v1.1.0.0_QC_stats.txt";
+    const TEMPERATURE_STATS_URL = "data/DCENT_v1.1.0.0_temperature_stats.txt";
+    const SCALE_MAXIMUMS = { ship: 2, buoy: 0.5 };
+    const ANOMALY_RANGE = 5; // °C; shared by all three June 2026 QC map modes.
+    const QC_SCATTER_MARKER_SIZES = { ship: 2.4, buoy: 2.8 }; // Marker radii in CSS pixels.
+    const QC_SCATTER_MARKER_OPACITY = { ship: 1, buoy: 1 };
+    const QC_PLATFORM_CODES = { ship: 1, buoy: 0 };
+    const QC_STATS_PASSED_OPACITY = 0.9;
+    const QC_STATS_FAILED_OPACITY = 0.4;
+    const PALETTE = ["#f7fbff", "#d6edf2", "#91c8d9", "#4d8cad", "#1c4c78"];
+    const ANOMALY_COLOURS = ["#231db8", "#1f4ed3", "#4888de", "#89c2de", "#c6ebe7", "#f6f8ee", "#f9e7b2", "#efa87e", "#d76f69", "#b43d46", "#861415", "#681415"];
+    const ROBINSON_X = [1, 0.9986, 0.9954, 0.99, 0.9822, 0.973, 0.96, 0.9427, 0.9216, 0.8962, 0.8679, 0.835, 0.7986, 0.7597, 0.7186, 0.6732, 0.6213, 0.5722, 0.5322];
+    const ROBINSON_Y = [0, 0.062, 0.124, 0.186, 0.248, 0.31, 0.372, 0.434, 0.4958, 0.5571, 0.6176, 0.6769, 0.7346, 0.7903, 0.8435, 0.8936, 0.9394, 0.9761, 1];
+    const ROBINSON_X_SCALE = 0.8487;
+    const ROBINSON_Y_SCALE = 1.3523;
+    const WORLD_BOUNDARIES_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+    const gridPromises = new Map();
+    let boundaryPromise;
+    let qcPointsPromise;
+    let qcStatsPromise;
+    let temperatureStatsPromise;
+
+    function parseGrid(text) {
+      const rows = text
+        .replace(/\r/g, "")
+        .split("\n")
+        .map(line => line.trim().replace(/^[\u0027"]|[\u0027"]$/g, ""))
+        .filter(Boolean)
+        .map(line => line.split(/\s+/).map(value => Number.parseFloat(value)));
+
+      if (rows.length !== LONGITUDES || rows.some(row => row.length !== LATITUDES)) {
+        throw new Error("The January grid does not have the expected 72 × 36 dimensions.");
+      }
+
+      const grid = new Float32Array(LONGITUDES * LATITUDES);
+      rows.forEach((row, longitudeIndex) => {
+        row.forEach((value, latitudeIndex) => {
+          grid[longitudeIndex * LATITUDES + latitudeIndex] = value;
+        });
+      });
+      return grid;
+    }
+
+    function loadGrid(platform) {
+      if (!gridPromises.has(platform)) {
+        gridPromises.set(platform, fetch(FILES[platform])
+          .then(response => {
+            if (!response.ok) throw new Error("The January data file could not be loaded.");
+            return response.text();
+          })
+          .then(parseGrid));
+      }
+      return gridPromises.get(platform);
+    }
+
+    function anomalyColourIndex(value) {
+      const fraction = Math.max(0, Math.min(1, (value + ANOMALY_RANGE) / (2 * ANOMALY_RANGE)));
+      return Math.min(ANOMALY_COLOURS.length - 1, Math.floor(fraction * ANOMALY_COLOURS.length));
+    }
+
+    function anomalyColour(value) {
+      return Number.isFinite(value) ? ANOMALY_COLOURS[anomalyColourIndex(value)] : "#d7d7d7";
+    }
+
+    function parseQcPoints(text) {
+      const points = text
+        .replace(/\r/g, "")
+        .split("\n")
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map(line => line.split(/\s+/).map(value => Number.parseFloat(value)))
+        .filter(values => values.length >= 4 && values.slice(0, 4).every(Number.isFinite))
+        .map(([longitude, latitude, anomaly, platform]) => ({
+          longitude: normaliseLongitude(longitude),
+          latitude,
+          anomaly,
+          platform
+        }));
+
+      if (!points.length) throw new Error("The June 2026 QC file contains no valid observations.");
+
+      const groups = ANOMALY_COLOURS.map(() => ({ ship: [], buoy: [] }));
+      points.forEach(point => {
+        const platform = point.platform === QC_PLATFORM_CODES.buoy ? "buoy" : "ship";
+        groups[anomalyColourIndex(point.anomaly)][platform].push(point);
+      });
+      return { groups };
+    }
+
+    function loadQcPoints() {
+      if (!qcPointsPromise) {
+        qcPointsPromise = fetch(QC_POINTS_URL)
+          .then(response => {
+            if (!response.ok) throw new Error("The June 2026 QC file could not be loaded.");
+            return response.text();
+          })
+          .then(parseQcPoints);
+      }
+      return qcPointsPromise;
+    }
+
+    function parseQcStats(text) {
+      const rows = text
+        .replace(/\r/g, "")
+        .split("\n")
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map(line => line.split(/\s+/).map(value => Number.parseFloat(value)))
+        .filter(values => values.length >= 7 && values.slice(0, 7).every(Number.isFinite))
+        .map(([year, shipWith, buoyWith, cmanWith, shipWithout, buoyWithout, cmanWithout]) => ({
+          year,
+          with: { ship: shipWith, buoy: buoyWith, cman: cmanWith },
+          without: { ship: shipWithout, buoy: buoyWithout, cman: cmanWithout }
+        }));
+
+      if (!rows.length) throw new Error("The annual QC statistics file contains no valid rows.");
+      return rows;
+    }
+
+    function loadQcStats() {
+      if (!qcStatsPromise) {
+        qcStatsPromise = fetch(QC_STATS_URL)
+          .then(response => {
+            if (!response.ok) throw new Error("The annual QC statistics file could not be loaded.");
+            return response.text();
+          })
+          .then(parseQcStats);
+      }
+      return qcStatsPromise;
+    }
+
+    function parseTemperatureStats(text) {
+      const rows = text
+        .replace(/\r/g, "")
+        .split("\n")
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map(line => line.split(/\s+/).map(value => Number.parseFloat(value)))
+        .filter(values => values.length >= 17 && values.slice(0, 17).every(Number.isFinite))
+        .map(([
+          year,
+          sstWithout, sstWithoutError, sstWith, sstWithError,
+          dcentISstWithout, dcentISstWithoutError, dcentISstWith, dcentISstWithError,
+          gmstWithout, gmstWithoutError, gmstWith, gmstWithError,
+          dcentIWithout, dcentIWithoutError, dcentIWith, dcentIWithError
+        ]) => ({
+          year,
+          sst: {
+            without: { value: sstWithout, error: sstWithoutError },
+            with: { value: sstWith, error: sstWithError }
+          },
+          dcentISst: {
+            without: { value: dcentISstWithout, error: dcentISstWithoutError },
+            with: { value: dcentISstWith, error: dcentISstWithError }
+          },
+          gmst: {
+            without: { value: gmstWithout, error: gmstWithoutError },
+            with: { value: gmstWith, error: gmstWithError }
+          },
+          dcentI: {
+            without: { value: dcentIWithout, error: dcentIWithoutError },
+            with: { value: dcentIWith, error: dcentIWithError }
+          }
+        }));
+
+      if (!rows.length) throw new Error("The annual temperature statistics file contains no valid rows.");
+      return rows;
+    }
+
+    function loadTemperatureStats() {
+      if (!temperatureStatsPromise) {
+        temperatureStatsPromise = fetch(TEMPERATURE_STATS_URL)
+          .then(response => {
+            if (!response.ok) throw new Error("The annual temperature statistics file could not be loaded.");
+            return response.text();
+          })
+          .then(parseTemperatureStats);
+      }
+      return temperatureStatsPromise;
+    }
+
+    function parseBoundaryPaths(text) {
+      const topology = JSON.parse(text);
+      const countries = topology.objects && topology.objects.countries;
+      if (!countries || !topology.transform || !Array.isArray(topology.arcs)) {
+        throw new Error("World boundaries are unavailable.");
+      }
+      const arcUses = new Map();
+      const collectArcs = arcs => {
+        if (Array.isArray(arcs)) arcs.forEach(collectArcs);
+        else if (Number.isInteger(arcs)) {
+          const index = arcs < 0 ? ~arcs : arcs;
+          arcUses.set(index, (arcUses.get(index) || 0) + 1);
+        }
+      };
+      const collectGeometry = geometry => {
+        if (geometry.type === "GeometryCollection") geometry.geometries.forEach(collectGeometry);
+        else collectArcs(geometry.arcs);
+      };
+      collectGeometry(countries);
+
+      const decodeArc = index => {
+        let longitude = 0;
+        let latitude = 0;
+        return topology.arcs[index].map(([deltaLongitude, deltaLatitude]) => {
+          longitude += deltaLongitude;
+          latitude += deltaLatitude;
+          return [
+            longitude * topology.transform.scale[0] + topology.transform.translate[0],
+            latitude * topology.transform.scale[1] + topology.transform.translate[1]
+          ];
+        });
+      };
+
+      return [...arcUses].reduce((paths, [index, uses]) => {
+        paths[uses === 1 ? "coastlines" : "borders"].push(decodeArc(index));
+        return paths;
+      }, { coastlines: [], borders: [] });
+    }
+
+    function loadBoundaries() {
+      if (!boundaryPromise) {
+        boundaryPromise = fetch(WORLD_BOUNDARIES_URL)
+          .then(response => {
+            if (!response.ok) throw new Error("World boundaries are unavailable.");
+            return response.text();
+          })
+          .then(parseBoundaryPaths)
+          .catch(() => ({ coastlines: [], borders: [] }));
+      }
+      return boundaryPromise;
+    }
+
+    function coefficient(series, latitude) {
+      const position = Math.min(90, Math.abs(latitude)) / 5;
+      const lower = Math.floor(position);
+      const upper = Math.min(series.length - 1, lower + 1);
+      return series[lower] + (series[upper] - series[lower]) * (position - lower);
+    }
+
+    function projectionScale(width, height) {
+      return Math.min(
+        (width - 34) / (2 * ROBINSON_X_SCALE * Math.PI),
+        (height - 22) / (2 * ROBINSON_Y_SCALE)
+      );
+    }
+
+    function createProjection(width, height) {
+      const scale = projectionScale(width, height);
+      return (longitude, latitude) => ({
+        x: width / 2 + ROBINSON_X_SCALE * scale * (longitude * Math.PI / 180) * coefficient(ROBINSON_X, latitude),
+        y: height / 2 - Math.sign(latitude) * ROBINSON_Y_SCALE * scale * coefficient(ROBINSON_Y, latitude)
+      });
+    }
+
+    function traceOutline(context, project) {
+      context.beginPath();
+      for (let latitude = -90; latitude <= 90; latitude += 2) {
+        const point = project(-180, latitude);
+        if (latitude === -90) context.moveTo(point.x, point.y);
+        else context.lineTo(point.x, point.y);
+      }
+      for (let longitude = -180; longitude <= 180; longitude += 2) {
+        const point = project(longitude, 90);
+        context.lineTo(point.x, point.y);
+      }
+      for (let latitude = 90; latitude >= -90; latitude -= 2) {
+        const point = project(180, latitude);
+        context.lineTo(point.x, point.y);
+      }
+      for (let longitude = 180; longitude >= -180; longitude -= 2) {
+        const point = project(longitude, -90);
+        context.lineTo(point.x, point.y);
+      }
+      context.closePath();
+    }
+
+    function normaliseLongitude(longitude) {
+      const normalised = longitude % 360;
+      return normalised < 0 ? normalised + 360 : normalised;
+    }
+
+    function relativeLongitude(longitude, centralLongitude) {
+      return ((longitude - centralLongitude + 540) % 360) - 180;
+    }
+
+    function hexToRgb(hex) {
+      return [
+        Number.parseInt(hex.slice(1, 3), 16),
+        Number.parseInt(hex.slice(3, 5), 16),
+        Number.parseInt(hex.slice(5, 7), 16)
+      ];
+    }
+
+    function fillColour(value, maximum) {
+      if (!Number.isFinite(value)) return "#d7d7d7";
+      const position = Math.max(0, Math.min(1, value / maximum)) * (PALETTE.length - 1);
+      const lower = Math.floor(position);
+      const upper = Math.min(PALETTE.length - 1, lower + 1);
+      const fraction = position - lower;
+      const first = hexToRgb(PALETTE[lower]);
+      const second = hexToRgb(PALETTE[upper]);
+      const rgb = first.map((component, index) => Math.round(component + (second[index] - component) * fraction));
+      return "rgb(" + rgb.join(",") + ")";
+    }
+
+    function drawGridlines(context, project) {
+      context.save();
+      traceOutline(context, project);
+      context.clip();
+      context.strokeStyle = "rgba(25, 62, 135, 0.14)";
+      context.lineWidth = 0.7;
+      for (let latitude = -60; latitude <= 60; latitude += 30) {
+        context.beginPath();
+        for (let longitude = -180; longitude <= 180; longitude += 2) {
+          const point = project(longitude, latitude);
+          if (longitude === -180) context.moveTo(point.x, point.y);
+          else context.lineTo(point.x, point.y);
+        }
+        context.stroke();
+      }
+      for (let longitude = -120; longitude <= 120; longitude += 60) {
+        context.beginPath();
+        for (let latitude = -90; latitude <= 90; latitude += 2) {
+          const point = project(longitude, latitude);
+          if (latitude === -90) context.moveTo(point.x, point.y);
+          else context.lineTo(point.x, point.y);
+        }
+        context.stroke();
+      }
+      context.restore();
+    }
+
+    function drawBoundary(context, coordinates, project, centralLongitude) {
+      context.beginPath();
+      let previousLongitude;
+      coordinates.forEach(([longitude, latitude], index) => {
+        const longitudeOnMap = relativeLongitude(longitude, centralLongitude);
+        const point = project(longitudeOnMap, latitude);
+        const crossesSeam = index > 0 && Math.abs(longitudeOnMap - previousLongitude) > 180;
+        if (index === 0 || crossesSeam) context.moveTo(point.x, point.y);
+        else context.lineTo(point.x, point.y);
+        previousLongitude = longitudeOnMap;
+      });
+      context.stroke();
+    }
+
+    function initialiseMap(map) {
+      if (map._dcentSigmaMapState) return;
+
+      const canvas = map.querySelector(".dcent-sigma-map__canvas");
+      const status = map.querySelector(".dcent-sigma-map__status");
+      const limitLabel = map.querySelector("[data-dcent-sigma-limit]");
+      const buttons = [...map.querySelectorAll("[data-dcent-sigma-platform]")];
+      let platform = "ship";
+      let grids = {};
+      let boundaries = { coastlines: [], borders: [] };
+      let frame;
+      let destroyed = false;
+      let centralLongitude = CENTRAL_LONGITUDE;
+      let drag;
+
+      function render() {
+        frame = undefined;
+        if (destroyed || !grids[platform]) return;
+        const bounds = canvas.getBoundingClientRect();
+        if (bounds.width < 2 || bounds.height < 2) return;
+
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        const width = Math.round(bounds.width * pixelRatio);
+        const height = Math.round(bounds.height * pixelRatio);
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+
+        const context = canvas.getContext("2d");
+        const project = createProjection(width, height);
+        const maximum = SCALE_MAXIMUMS[platform];
+        const grid = grids[platform];
+        const mapWest = centralLongitude - 180;
+        const mapEast = centralLongitude + 180;
+        context.clearRect(0, 0, width, height);
+        context.fillStyle = "#fff";
+        context.fillRect(0, 0, width, height);
+
+        context.save();
+        traceOutline(context, project);
+        context.clip();
+        for (let longitudeIndex = 0; longitudeIndex < LONGITUDES; longitudeIndex += 1) {
+          for (let latitudeIndex = 0; latitudeIndex < LATITUDES; latitudeIndex += 1) {
+            const value = grid[longitudeIndex * LATITUDES + latitudeIndex];
+            const west = longitudeIndex * 5;
+            const east = west + 5;
+            const south = -90 + latitudeIndex * 5;
+            const north = south + 5;
+            context.fillStyle = fillColour(value, maximum);
+            for (let offset = -360; offset <= 360; offset += 360) {
+              const segmentWest = Math.max(mapWest, west + offset);
+              const segmentEast = Math.min(mapEast, east + offset);
+              if (segmentEast <= segmentWest) continue;
+              const corners = [
+                [segmentWest - centralLongitude, south],
+                [segmentEast - centralLongitude, south],
+                [segmentEast - centralLongitude, north],
+                [segmentWest - centralLongitude, north]
+              ];
+              context.beginPath();
+              corners.forEach(([longitude, latitude], index) => {
+                const point = project(longitude, latitude);
+                if (index === 0) context.moveTo(point.x, point.y);
+                else context.lineTo(point.x, point.y);
+              });
+              context.closePath();
+              context.fill();
+            }
+          }
+        }
+        context.restore();
+
+        drawGridlines(context, project);
+        context.save();
+        context.lineJoin = "round";
+        context.lineCap = "round";
+        context.strokeStyle = "rgba(20, 26, 36, 0.92)";
+        context.lineWidth = Math.max(1, pixelRatio * 0.85);
+        boundaries.coastlines.forEach(path => drawBoundary(context, path, project, centralLongitude));
+        context.strokeStyle = "rgba(20, 26, 36, 0.68)";
+        context.lineWidth = Math.max(0.65, pixelRatio * 0.42);
+        boundaries.borders.forEach(path => drawBoundary(context, path, project, centralLongitude));
+        context.strokeStyle = "rgba(25, 62, 135, 0.86)";
+        context.lineWidth = Math.max(0.9, pixelRatio * 0.65);
+        traceOutline(context, project);
+        context.stroke();
+        context.restore();
+      }
+
+      function scheduleRender() {
+        if (destroyed || frame !== undefined) return;
+        frame = requestAnimationFrame(render);
+      }
+
+      function selectPlatform(nextPlatform) {
+        platform = nextPlatform;
+        buttons.forEach(button => {
+          button.setAttribute("aria-pressed", String(button.dataset.dcentSigmaPlatform === platform));
+        });
+        limitLabel.textContent = SCALE_MAXIMUMS[platform] + " °C";
+        if (grids[platform]) {
+          status.hidden = true;
+          scheduleRender();
+        } else {
+          status.hidden = false;
+          status.textContent = "Loading " + platform + " January estimates…";
+        }
+      }
+
+      const resizeObserver = new ResizeObserver(scheduleRender);
+      resizeObserver.observe(map);
+      buttons.forEach(button => {
+        button.addEventListener("click", () => selectPlatform(button.dataset.dcentSigmaPlatform));
+      });
+
+      function endDrag(event) {
+        if (!drag || event.pointerId !== drag.pointerId) return;
+        drag = undefined;
+        canvas.classList.remove("is-dragging");
+        if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+      }
+
+      function moveMap(event) {
+        if (!drag || event.pointerId !== drag.pointerId) return;
+        const bounds = canvas.getBoundingClientRect();
+        const scale = projectionScale(bounds.width, bounds.height);
+        const degreesPerPixel = 180 / (ROBINSON_X_SCALE * scale * Math.PI);
+        centralLongitude = normaliseLongitude(drag.centralLongitude - (event.clientX - drag.clientX) * degreesPerPixel);
+        scheduleRender();
+      }
+
+      function startDrag(event) {
+        if (!grids[platform]) return;
+        drag = {
+          pointerId: event.pointerId,
+          clientX: event.clientX,
+          centralLongitude
+        };
+        canvas.setPointerCapture(event.pointerId);
+        canvas.classList.add("is-dragging");
+        event.preventDefault();
+      }
+
+      canvas.addEventListener("pointerdown", startDrag);
+      canvas.addEventListener("pointermove", moveMap);
+      canvas.addEventListener("pointerup", endDrag);
+      canvas.addEventListener("pointercancel", endDrag);
+      canvas.addEventListener("lostpointercapture", endDrag);
+
+      map._dcentSigmaMapState = {
+        destroy() {
+          destroyed = true;
+          resizeObserver.disconnect();
+          if (frame !== undefined) cancelAnimationFrame(frame);
+          canvas.removeEventListener("pointerdown", startDrag);
+          canvas.removeEventListener("pointermove", moveMap);
+          canvas.removeEventListener("pointerup", endDrag);
+          canvas.removeEventListener("pointercancel", endDrag);
+          canvas.removeEventListener("lostpointercapture", endDrag);
+        }
+      };
+
+      loadGrid("ship")
+        .then(grid => {
+          grids.ship = grid;
+          if (!destroyed && platform === "ship") {
+            status.hidden = true;
+            scheduleRender();
+          }
+        })
+        .catch(() => {
+          if (!destroyed && platform === "ship") {
+            status.hidden = false;
+            status.textContent = "The January ship estimates could not be loaded.";
+          }
+        });
+      loadGrid("buoy")
+        .then(grid => {
+          grids.buoy = grid;
+          if (!destroyed && platform === "buoy") {
+            status.hidden = true;
+            scheduleRender();
+          }
+        })
+        .catch(() => {
+          if (!destroyed && platform === "buoy") {
+            status.hidden = false;
+            status.textContent = "The January buoy estimates could not be loaded.";
+          }
+        });
+      loadBoundaries().then(paths => {
+        boundaries = paths;
+        scheduleRender();
+      });
+      requestAnimationFrame(scheduleRender);
+    }
+
+    function drawAnomalyGrid(context, project, grid, centralLongitude) {
+      const mapWest = centralLongitude - 180;
+      const mapEast = centralLongitude + 180;
+      context.save();
+      traceOutline(context, project);
+      context.clip();
+      for (let longitudeIndex = 0; longitudeIndex < LONGITUDES; longitudeIndex += 1) {
+        for (let latitudeIndex = 0; latitudeIndex < LATITUDES; latitudeIndex += 1) {
+          const west = longitudeIndex * 5;
+          const east = west + 5;
+          const south = -90 + latitudeIndex * 5;
+          const north = south + 5;
+          context.fillStyle = anomalyColour(grid[longitudeIndex * LATITUDES + latitudeIndex]);
+          for (let offset = -360; offset <= 360; offset += 360) {
+            const segmentWest = Math.max(mapWest, west + offset);
+            const segmentEast = Math.min(mapEast, east + offset);
+            if (segmentEast <= segmentWest) continue;
+            const corners = [
+              [segmentWest - centralLongitude, south],
+              [segmentEast - centralLongitude, south],
+              [segmentEast - centralLongitude, north],
+              [segmentWest - centralLongitude, north]
+            ];
+            context.beginPath();
+            corners.forEach(([longitude, latitude], index) => {
+              const point = project(longitude, latitude);
+              if (index === 0) context.moveTo(point.x, point.y);
+              else context.lineTo(point.x, point.y);
+            });
+            context.closePath();
+            context.fill();
+          }
+        }
+      }
+      context.restore();
+    }
+
+    function drawFailedQcPoints(context, project, groups, centralLongitude, pixelRatio) {
+      const shipRadius = QC_SCATTER_MARKER_SIZES.ship * pixelRatio;
+      const buoyRadius = QC_SCATTER_MARKER_SIZES.buoy * pixelRatio;
+      context.save();
+      traceOutline(context, project);
+      context.clip();
+
+      ["ship", "buoy"].forEach(platform => {
+        groups.forEach((platformGroups, colourIndex) => {
+          const points = platformGroups[platform];
+          if (!points.length) return;
+          const isBuoy = platform === "buoy";
+          const radius = isBuoy ? buoyRadius : shipRadius;
+          context.beginPath();
+          points.forEach(point => {
+            const position = project(relativeLongitude(point.longitude, centralLongitude), point.latitude);
+            if (isBuoy) {
+              context.moveTo(position.x, position.y - radius);
+              context.lineTo(position.x + radius, position.y);
+              context.lineTo(position.x, position.y + radius);
+              context.lineTo(position.x - radius, position.y);
+              context.closePath();
+            } else {
+              context.moveTo(position.x + radius, position.y);
+              context.arc(position.x, position.y, radius, 0, Math.PI * 2);
+            }
+          });
+          context.fillStyle = ANOMALY_COLOURS[colourIndex];
+          context.globalAlpha = isBuoy ? QC_SCATTER_MARKER_OPACITY.buoy : QC_SCATTER_MARKER_OPACITY.ship;
+          context.fill();
+        });
+      });
+      context.restore();
+    }
+
+    function drawMapDetails(context, project, boundaries, centralLongitude, pixelRatio) {
+      drawGridlines(context, project);
+      context.save();
+      context.lineJoin = "round";
+      context.lineCap = "round";
+      context.strokeStyle = "rgba(20, 26, 36, 0.92)";
+      context.lineWidth = Math.max(1, pixelRatio * 0.85);
+      boundaries.coastlines.forEach(path => drawBoundary(context, path, project, centralLongitude));
+      context.strokeStyle = "rgba(20, 26, 36, 0.68)";
+      context.lineWidth = Math.max(0.65, pixelRatio * 0.42);
+      boundaries.borders.forEach(path => drawBoundary(context, path, project, centralLongitude));
+      context.strokeStyle = "rgba(25, 62, 135, 0.86)";
+      context.lineWidth = Math.max(0.9, pixelRatio * 0.65);
+      traceOutline(context, project);
+      context.stroke();
+      context.restore();
+    }
+
+    function initialiseQcMap(map) {
+      if (map._dcentQcMapState) return;
+
+      const modes = {
+        failed: {
+          title: "Observations failing the additional QC, June 2026",
+          type: "points",
+          load: loadQcPoints
+        },
+        before: {
+          title: "Gridded anomaly without the additional QC, June 2026",
+          type: "grid",
+          load: () => loadGrid("before")
+        },
+        after: {
+          title: "Gridded anomaly with the additional QC, June 2026",
+          type: "grid",
+          load: () => loadGrid("after")
+        }
+      };
+      const canvas = map.querySelector(".dcent-sigma-map__canvas");
+      const status = map.querySelector(".dcent-sigma-map__status");
+      const title = map.querySelector("[data-dcent-qc-title]");
+      const markerLegend = map.querySelector("[data-dcent-qc-marker-legend]");
+      const anomalyMinimum = map.querySelector("[data-dcent-qc-anomaly-min]");
+      const anomalyMaximum = map.querySelector("[data-dcent-qc-anomaly-max]");
+      const buttons = [...map.querySelectorAll("[data-dcent-qc-mode]")];
+      const data = {};
+      let mode = "failed";
+      let boundaries = { coastlines: [], borders: [] };
+      let centralLongitude = CENTRAL_LONGITUDE;
+      let frame;
+      let drag;
+      let destroyed = false;
+
+      function render() {
+        frame = undefined;
+        if (destroyed || !data[mode]) return;
+        const bounds = canvas.getBoundingClientRect();
+        if (bounds.width < 2 || bounds.height < 2) return;
+
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        const width = Math.round(bounds.width * pixelRatio);
+        const height = Math.round(bounds.height * pixelRatio);
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+
+        const context = canvas.getContext("2d");
+        const project = createProjection(width, height);
+        context.clearRect(0, 0, width, height);
+        context.fillStyle = "#fff";
+        context.fillRect(0, 0, width, height);
+        if (modes[mode].type === "points") {
+          drawFailedQcPoints(context, project, data[mode].groups, centralLongitude, pixelRatio);
+        } else {
+          drawAnomalyGrid(context, project, data[mode], centralLongitude);
+        }
+        drawMapDetails(context, project, boundaries, centralLongitude, pixelRatio);
+      }
+
+      function scheduleRender() {
+        if (destroyed || frame !== undefined) return;
+        frame = requestAnimationFrame(render);
+      }
+
+      function loadMode(nextMode) {
+        const configuration = modes[nextMode];
+        if (data[nextMode]) {
+          if (mode === nextMode) {
+            status.hidden = true;
+            scheduleRender();
+          }
+          return;
+        }
+        status.hidden = false;
+        status.textContent = "Loading June 2026 " + (configuration.type === "points" ? "QC observations…" : "gridded anomalies…");
+        configuration.load()
+          .then(result => {
+            data[nextMode] = result;
+            if (!destroyed && mode === nextMode) {
+              status.hidden = true;
+              scheduleRender();
+            }
+          })
+          .catch(() => {
+            if (!destroyed && mode === nextMode) {
+              status.hidden = false;
+              status.textContent = "This June 2026 map could not be loaded.";
+            }
+          });
+      }
+
+      function selectMode(nextMode) {
+        mode = nextMode;
+        title.textContent = modes[mode].title;
+        markerLegend.classList.toggle("is-placeholder", modes[mode].type !== "points");
+        markerLegend.setAttribute("aria-hidden", String(modes[mode].type !== "points"));
+        buttons.forEach(button => {
+          button.setAttribute("aria-pressed", String(button.dataset.dcentQcMode === mode));
+        });
+        loadMode(mode);
+      }
+
+      function endDrag(event) {
+        if (!drag || event.pointerId !== drag.pointerId) return;
+        drag = undefined;
+        canvas.classList.remove("is-dragging");
+        if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+      }
+
+      function moveMap(event) {
+        if (!drag || event.pointerId !== drag.pointerId) return;
+        const bounds = canvas.getBoundingClientRect();
+        const scale = projectionScale(bounds.width, bounds.height);
+        const degreesPerPixel = 180 / (ROBINSON_X_SCALE * scale * Math.PI);
+        centralLongitude = normaliseLongitude(drag.centralLongitude - (event.clientX - drag.clientX) * degreesPerPixel);
+        scheduleRender();
+      }
+
+      function startDrag(event) {
+        if (!data[mode]) return;
+        drag = {
+          pointerId: event.pointerId,
+          clientX: event.clientX,
+          centralLongitude
+        };
+        canvas.setPointerCapture(event.pointerId);
+        canvas.classList.add("is-dragging");
+        event.preventDefault();
+      }
+
+      function onModeButtonClick(event) {
+        selectMode(event.currentTarget.dataset.dcentQcMode);
+      }
+
+      const resizeObserver = new ResizeObserver(scheduleRender);
+      resizeObserver.observe(map);
+      buttons.forEach(button => button.addEventListener("click", onModeButtonClick));
+      canvas.addEventListener("pointerdown", startDrag);
+      canvas.addEventListener("pointermove", moveMap);
+      canvas.addEventListener("pointerup", endDrag);
+      canvas.addEventListener("pointercancel", endDrag);
+      canvas.addEventListener("lostpointercapture", endDrag);
+
+      map._dcentQcMapState = {
+        destroy() {
+          destroyed = true;
+          resizeObserver.disconnect();
+          if (frame !== undefined) cancelAnimationFrame(frame);
+          buttons.forEach(button => button.removeEventListener("click", onModeButtonClick));
+          canvas.removeEventListener("pointerdown", startDrag);
+          canvas.removeEventListener("pointermove", moveMap);
+          canvas.removeEventListener("pointerup", endDrag);
+          canvas.removeEventListener("pointercancel", endDrag);
+          canvas.removeEventListener("lostpointercapture", endDrag);
+        }
+      };
+
+      loadBoundaries().then(paths => {
+        boundaries = paths;
+        scheduleRender();
+      });
+      anomalyMinimum.textContent = "−" + ANOMALY_RANGE + "°C";
+      anomalyMaximum.textContent = ANOMALY_RANGE + "°C";
+      selectMode(mode);
+    }
+
+    function niceAxisMaximum(value) {
+      const magnitude = 10 ** Math.floor(Math.log10(Math.max(value, 1)));
+      return Math.ceil(value / (2 * magnitude)) * 2 * magnitude;
+    }
+
+    function formatMeasurementCount(value) {
+      if (value >= 1000000) {
+        const millions = value / 1000000;
+        return (millions >= 10 ? Math.round(millions) : millions.toFixed(1)) + "M";
+      }
+      if (value >= 1000) return Math.round(value / 1000) + "k";
+      return String(Math.round(value));
+    }
+
+    function translucentColour(hex, opacity) {
+      const [red, green, blue] = hexToRgb(hex);
+      return "rgba(" + red + "," + green + "," + blue + "," + opacity + ")";
+    }
+
+    function initialiseQcStats(chart) {
+      if (chart._dcentQcStatsState) return;
+
+      const canvas = chart.querySelector(".dcent-qc-stats__canvas");
+      const status = chart.querySelector(".dcent-qc-stats__status");
+      const buttons = [...chart.querySelectorAll("[data-dcent-qc-stats-view]")];
+      const platforms = ["ship", "buoy", "cman"];
+      const chartStyles = getComputedStyle(chart);
+      const platformColours = {
+        ship: chartStyles.getPropertyValue("--dcent-qc-stats-ship").trim(),
+        buoy: chartStyles.getPropertyValue("--dcent-qc-stats-buoy").trim(),
+        cman: chartStyles.getPropertyValue("--dcent-qc-stats-cman").trim()
+      };
+      let view = "count";
+      let rows;
+      let frame;
+      let destroyed = false;
+
+      function scheduleRender() {
+        if (destroyed || frame !== undefined) return;
+        frame = requestAnimationFrame(render);
+      }
+
+      function valuesFor(row, section) {
+        const rawValues = section === "passed"
+          ? row.with
+          : platforms.reduce((values, platform) => {
+            values[platform] = Math.max(0, row.without[platform] - row.with[platform]);
+            return values;
+          }, {});
+        if (view === "count") return rawValues;
+        const denominator = platforms.reduce((sum, platform) => sum + row.without[platform], 0);
+        return platforms.reduce((values, platform) => {
+          values[platform] = denominator ? rawValues[platform] / denominator * 100 : 0;
+          return values;
+        }, {});
+      }
+
+      function drawStack(context, x, width, values, section, yScale, startBottom) {
+        let bottom = startBottom;
+        platforms.forEach(platform => {
+          const height = yScale(values[platform]);
+          if (height <= 0) return;
+          bottom -= height;
+          context.fillStyle = translucentColour(
+            platformColours[platform],
+            section === "passed" ? QC_STATS_PASSED_OPACITY : QC_STATS_FAILED_OPACITY
+          );
+          context.fillRect(x, bottom, width, height);
+        });
+        return bottom;
+      }
+
+      function render() {
+        frame = undefined;
+        if (destroyed || !rows) return;
+        const bounds = canvas.getBoundingClientRect();
+        if (bounds.width < 2 || bounds.height < 2) return;
+
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        const width = Math.round(bounds.width * pixelRatio);
+        const height = Math.round(bounds.height * pixelRatio);
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+
+        const context = canvas.getContext("2d");
+        const margin = {
+          top: 14 * pixelRatio,
+          right: 10 * pixelRatio,
+          bottom: 44 * pixelRatio,
+          left: 62 * pixelRatio
+        };
+        const plotLeft = margin.left;
+        const plotRight = width - margin.right;
+        const plotTop = margin.top;
+        const plotBottom = height - margin.bottom;
+        const plotWidth = plotRight - plotLeft;
+        const plotHeight = plotBottom - plotTop;
+        const totals = rows.map(row => platforms.reduce((sum, platform) => sum + row.without[platform], 0));
+        const maximum = view === "count" ? niceAxisMaximum(Math.max(...totals)) : 100;
+        const yScale = value => value / maximum * plotHeight;
+
+        context.clearRect(0, 0, width, height);
+        context.fillStyle = "#fff";
+        context.fillRect(0, 0, width, height);
+        context.font = (12.5 * pixelRatio) + "px Arial, Helvetica, sans-serif";
+        context.textBaseline = "middle";
+        context.textAlign = "right";
+
+        for (let tick = 0; tick <= 5; tick += 1) {
+          const value = maximum * tick / 5;
+          const y = plotBottom - yScale(value);
+          context.strokeStyle = tick === 0 ? "rgba(25, 62, 135, 0.42)" : "rgba(25, 62, 135, 0.13)";
+          context.lineWidth = tick === 0 ? 1 * pixelRatio : 0.7 * pixelRatio;
+          context.beginPath();
+          context.moveTo(plotLeft, y);
+          context.lineTo(plotRight, y);
+          context.stroke();
+          context.fillStyle = "#52657e";
+          context.fillText(view === "count" ? formatMeasurementCount(value) : Math.round(value) + "%", plotLeft - 7 * pixelRatio, y);
+        }
+
+        const groupWidth = plotWidth / rows.length;
+        const barWidth = groupWidth + pixelRatio;
+        rows.forEach((row, index) => {
+          const centre = plotLeft + (index + 0.5) * groupWidth;
+          const x = centre - barWidth / 2;
+          const passedTop = drawStack(context, x, barWidth, valuesFor(row, "passed"), "passed", yScale, plotBottom);
+          drawStack(context, x, barWidth, valuesFor(row, "failed"), "failed", yScale, passedTop);
+          if (index === 0 || index === rows.length - 1 || row.year % 5 === 0) {
+            context.save();
+            context.translate(centre, plotBottom + 8 * pixelRatio);
+            context.rotate(-Math.PI / 4);
+            context.fillStyle = "#52657e";
+            context.font = (11.5 * pixelRatio) + "px Arial, Helvetica, sans-serif";
+            context.textAlign = "right";
+            context.textBaseline = "middle";
+            context.fillText(row.year, 0, 0);
+            context.restore();
+          }
+        });
+
+        context.save();
+        context.translate(12 * pixelRatio, plotTop + plotHeight / 2);
+        context.rotate(-Math.PI / 2);
+        context.fillStyle = "#52657e";
+        context.font = (11.5 * pixelRatio) + "px Arial, Helvetica, sans-serif";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText(view === "count" ? "# of measurements" : "Share of measurements before additional QC (%)", 0, 0);
+        context.restore();
+      }
+
+      function selectView(nextView) {
+        view = nextView;
+        buttons.forEach(button => {
+          button.setAttribute("aria-pressed", String(button.dataset.dcentQcStatsView === view));
+        });
+        scheduleRender();
+      }
+
+      function onViewButtonClick(event) {
+        selectView(event.currentTarget.dataset.dcentQcStatsView);
+      }
+
+      const resizeObserver = new ResizeObserver(scheduleRender);
+      resizeObserver.observe(chart);
+      buttons.forEach(button => button.addEventListener("click", onViewButtonClick));
+      chart._dcentQcStatsState = {
+        destroy() {
+          destroyed = true;
+          resizeObserver.disconnect();
+          if (frame !== undefined) cancelAnimationFrame(frame);
+          buttons.forEach(button => button.removeEventListener("click", onViewButtonClick));
+        }
+      };
+
+      loadQcStats()
+        .then(data => {
+          rows = data;
+          if (!destroyed) {
+            status.hidden = true;
+            scheduleRender();
+          }
+        })
+        .catch(() => {
+          if (!destroyed) {
+            status.hidden = false;
+            status.textContent = "The annual measurement counts could not be loaded.";
+          }
+        });
+    }
+
+    function temperatureTickStep(value) {
+      const magnitude = 10 ** Math.floor(Math.log10(Math.max(value, 0.001)));
+      const fraction = value / magnitude;
+      const multiplier = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 2.5 ? 2.5 : fraction <= 5 ? 5 : 10;
+      return multiplier * magnitude;
+    }
+
+    function initialiseTemperatureChart(chart) {
+      if (chart._dcentQcTemperatureState) return;
+
+      const views = {
+        sst: { title: "DCENT global SST anomaly" },
+        dcentISst: { title: "DCENT-I global SST anomaly" },
+        gmst: { title: "DCENT global mean surface temperature anomaly" },
+        dcentI: { title: "DCENT-I global mean surface temperature anomaly" }
+      };
+      const canvas = chart.querySelector(".dcent-qc-temperature__canvas");
+      const status = chart.querySelector(".dcent-qc-temperature__status");
+      const title = chart.querySelector("[data-dcent-qc-temperature-title]");
+      const buttons = [...chart.querySelectorAll("[data-dcent-qc-temperature-view]")];
+      const chartStyles = getComputedStyle(chart);
+      const colours = {
+        with: chartStyles.getPropertyValue("--dcent-qc-temperature-with").trim(),
+        without: chartStyles.getPropertyValue("--dcent-qc-temperature-without").trim(),
+        difference: chartStyles.getPropertyValue("--dcent-qc-temperature-difference").trim()
+      };
+      let view = "sst";
+      let rows;
+      let frame;
+      let destroyed = false;
+
+      function scheduleRender() {
+        if (destroyed || frame !== undefined) return;
+        frame = requestAnimationFrame(render);
+      }
+
+      function seriesForCurrentView() {
+        return {
+          with: rows.map(row => ({ year: row.year, ...row[view].with })),
+          without: rows.map(row => ({ year: row.year, ...row[view].without }))
+        };
+      }
+
+      function drawBand(context, records, x, y, colour) {
+        context.beginPath();
+        records.forEach((record, index) => {
+          const pointX = x(record.year);
+          const pointY = y(record.value + record.error);
+          if (index === 0) context.moveTo(pointX, pointY);
+          else context.lineTo(pointX, pointY);
+        });
+        records.slice().reverse().forEach(record => {
+          context.lineTo(x(record.year), y(record.value - record.error));
+        });
+        context.closePath();
+        context.fillStyle = translucentColour(colour, 0.18);
+        context.fill();
+      }
+
+      function drawLine(context, records, x, y, colour, dashed, pixelRatio) {
+        context.beginPath();
+        records.forEach((record, index) => {
+          const pointX = x(record.year);
+          const pointY = y(record.value);
+          if (index === 0) context.moveTo(pointX, pointY);
+          else context.lineTo(pointX, pointY);
+        });
+        context.strokeStyle = colour;
+        context.lineWidth = 1.8 * pixelRatio;
+        context.setLineDash(dashed ? [5 * pixelRatio, 3 * pixelRatio] : []);
+        context.stroke();
+        context.setLineDash([]);
+
+        context.fillStyle = colour;
+        records.forEach(record => {
+          context.beginPath();
+          context.arc(x(record.year), y(record.value), 1.55 * pixelRatio, 0, Math.PI * 2);
+          context.fill();
+        });
+        const latest = records[records.length - 1];
+        context.beginPath();
+        context.arc(x(latest.year), y(latest.value), 3.2 * pixelRatio, 0, Math.PI * 2);
+        context.fill();
+      }
+
+      function drawDifference(context, records, x, y, colour, pixelRatio) {
+        context.beginPath();
+        records.forEach((record, index) => {
+          const pointX = x(record.year);
+          const pointY = y(record.value);
+          if (index === 0) context.moveTo(pointX, pointY);
+          else context.lineTo(pointX, pointY);
+        });
+        context.strokeStyle = colour;
+        context.lineWidth = 3 * pixelRatio;
+        context.setLineDash([]);
+        context.stroke();
+        const latest = records[records.length - 1];
+        context.fillStyle = colour;
+        context.beginPath();
+        context.arc(x(latest.year), y(latest.value), 2.7 * pixelRatio, 0, Math.PI * 2);
+        context.fill();
+      }
+
+      function render() {
+        frame = undefined;
+        if (destroyed || !rows) return;
+        const bounds = canvas.getBoundingClientRect();
+        if (bounds.width < 2 || bounds.height < 2) return;
+
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        const width = Math.round(bounds.width * pixelRatio);
+        const height = Math.round(bounds.height * pixelRatio);
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+
+        const margin = {
+          top: 14 * pixelRatio,
+          right: 64 * pixelRatio,
+          bottom: 43 * pixelRatio,
+          left: 62 * pixelRatio
+        };
+        const plotLeft = margin.left;
+        const plotRight = width - margin.right;
+        const plotTop = margin.top;
+        const plotBottom = height - margin.bottom;
+        const plotWidth = plotRight - plotLeft;
+        const plotHeight = plotBottom - plotTop;
+        const series = seriesForCurrentView();
+        const differences = series.with.map((record, index) => ({
+          year: record.year,
+          value: record.value - series.without[index].value
+        }));
+        const firstYear = rows[0].year;
+        const lastYear = rows[rows.length - 1].year;
+        const limits = ["with", "without"].flatMap(key => series[key].flatMap(record => [
+          record.value - record.error,
+          record.value + record.error
+        ]));
+        const rawMinimum = Math.min(...limits);
+        const rawMaximum = Math.max(...limits);
+        const padding = Math.max(0.025, (rawMaximum - rawMinimum) * 0.06);
+        const tickStep = temperatureTickStep((rawMaximum - rawMinimum + 2 * padding) / 5);
+        const minimum = Math.floor((rawMinimum - padding) / tickStep) * tickStep;
+        const maximum = Math.ceil((rawMaximum + padding) / tickStep) * tickStep;
+        const decimals = tickStep < 1 ? Math.max(1, Math.ceil(-Math.log10(tickStep))) : 0;
+        const largestDifference = Math.max(...differences.map(record => Math.abs(record.value)));
+        const differenceTickStep = 0.05;
+        const differenceMaximum = 0.1;
+        const differenceDecimals = differenceTickStep < 1
+          ? Math.max(1, Math.ceil(-Math.log10(differenceTickStep)))
+          : 0;
+        const x = year => plotLeft + ((year - (firstYear - 0.5)) / ((lastYear + 0.5) - (firstYear - 0.5))) * plotWidth;
+        const y = value => plotTop + ((maximum - value) / (maximum - minimum)) * plotHeight;
+        const differenceY = value => plotTop + ((differenceMaximum - value) / (2 * differenceMaximum)) * plotHeight;
+
+        const context = canvas.getContext("2d");
+        context.clearRect(0, 0, width, height);
+        context.fillStyle = "#fff";
+        context.fillRect(0, 0, width, height);
+        context.font = (12.5 * pixelRatio) + "px Arial, Helvetica, sans-serif";
+        context.textBaseline = "middle";
+        context.textAlign = "right";
+
+        for (let value = minimum; value <= maximum + tickStep / 10; value += tickStep) {
+          const rounded = Math.round(value / tickStep) * tickStep;
+          const position = y(rounded);
+          const isZero = Math.abs(rounded) < tickStep / 100;
+          context.strokeStyle = isZero ? "rgba(25, 62, 135, 0.42)" : "rgba(25, 62, 135, 0.13)";
+          context.lineWidth = isZero ? 1 * pixelRatio : 0.7 * pixelRatio;
+          context.beginPath();
+          context.moveTo(plotLeft, position);
+          context.lineTo(plotRight, position);
+          context.stroke();
+          context.fillStyle = "#52657e";
+          context.fillText(rounded.toFixed(decimals).replace(/\.0+$/, ""), plotLeft - 7 * pixelRatio, position);
+        }
+
+        context.save();
+        context.beginPath();
+        context.rect(plotLeft, plotTop, plotWidth, plotHeight);
+        context.clip();
+        drawBand(context, series.without, x, y, colours.without);
+        drawBand(context, series.with, x, y, colours.with);
+        drawLine(context, series.without, x, y, colours.without, true, pixelRatio);
+        drawLine(context, series.with, x, y, colours.with, false, pixelRatio);
+        context.beginPath();
+        context.moveTo(plotLeft, differenceY(0));
+        context.lineTo(plotRight, differenceY(0));
+        context.strokeStyle = "rgba(63, 74, 93, 0.36)";
+        context.lineWidth = 0.8 * pixelRatio;
+        context.setLineDash([3 * pixelRatio, 3 * pixelRatio]);
+        context.stroke();
+        context.setLineDash([]);
+        drawDifference(context, differences, x, differenceY, colours.difference, pixelRatio);
+        context.restore();
+
+        context.font = (12.5 * pixelRatio) + "px Arial, Helvetica, sans-serif";
+        context.textAlign = "left";
+        context.textBaseline = "middle";
+        for (let value = -differenceMaximum; value <= differenceMaximum + differenceTickStep / 10; value += differenceTickStep) {
+          const rounded = Math.round(value / differenceTickStep) * differenceTickStep;
+          context.fillStyle = "#52657e";
+          context.fillText(
+            rounded.toFixed(differenceDecimals).replace(/\.0+$/, ""),
+            plotRight + 7 * pixelRatio,
+            differenceY(rounded)
+          );
+        }
+
+        context.font = (11.5 * pixelRatio) + "px Arial, Helvetica, sans-serif";
+        context.textAlign = "center";
+        context.textBaseline = "top";
+        rows.forEach((row, index) => {
+          if (index === 0 || index === rows.length - 1 || row.year % 5 === 0) {
+            context.fillStyle = "#52657e";
+            context.fillText(row.year, x(row.year), plotBottom + 8 * pixelRatio);
+          }
+        });
+
+        context.save();
+        context.translate(12 * pixelRatio, plotTop + plotHeight / 2);
+        context.rotate(-Math.PI / 2);
+        context.fillStyle = "#52657e";
+        context.font = (11.5 * pixelRatio) + "px Arial, Helvetica, sans-serif";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText("Temperature anomaly (°C)", 0, 0);
+        context.restore();
+
+        context.save();
+        context.translate(width - 12 * pixelRatio, plotTop + plotHeight / 2);
+        context.rotate(Math.PI / 2);
+        context.fillStyle = "#52657e";
+        context.font = (11.5 * pixelRatio) + "px Arial, Helvetica, sans-serif";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText("Difference (°C)", 0, 0);
+        context.restore();
+      }
+
+      function selectView(nextView) {
+        view = nextView;
+        title.textContent = views[view].title;
+        buttons.forEach(button => {
+          button.setAttribute("aria-pressed", String(button.dataset.dcentQcTemperatureView === view));
+        });
+        scheduleRender();
+      }
+
+      function onViewButtonClick(event) {
+        selectView(event.currentTarget.dataset.dcentQcTemperatureView);
+      }
+
+      const resizeObserver = new ResizeObserver(scheduleRender);
+      resizeObserver.observe(chart);
+      buttons.forEach(button => button.addEventListener("click", onViewButtonClick));
+      chart._dcentQcTemperatureState = {
+        destroy() {
+          destroyed = true;
+          resizeObserver.disconnect();
+          if (frame !== undefined) cancelAnimationFrame(frame);
+          buttons.forEach(button => button.removeEventListener("click", onViewButtonClick));
+        }
+      };
+
+      loadTemperatureStats()
+        .then(data => {
+          rows = data;
+          if (!destroyed) {
+            status.hidden = true;
+            scheduleRender();
+          }
+        })
+        .catch(() => {
+          if (!destroyed) {
+            status.hidden = false;
+            status.textContent = "The annual temperature statistics could not be loaded.";
+          }
+        });
+    }
+
+    function initialiseMaps(scope) {
+      if (!scope) return;
+      scope.querySelectorAll("[data-dcent-sigma-map]").forEach(initialiseMap);
+      scope.querySelectorAll("[data-dcent-qc-map]").forEach(initialiseQcMap);
+      scope.querySelectorAll("[data-dcent-qc-stats]").forEach(initialiseQcStats);
+      scope.querySelectorAll("[data-dcent-qc-temperature]").forEach(initialiseTemperatureChart);
+    }
+
+    function disposeMaps(scope) {
+      if (!scope) return;
+      scope.querySelectorAll("[data-dcent-sigma-map]").forEach(map => {
+        map._dcentSigmaMapState?.destroy();
+      });
+      scope.querySelectorAll("[data-dcent-qc-map]").forEach(map => {
+        map._dcentQcMapState?.destroy();
+      });
+      scope.querySelectorAll("[data-dcent-qc-stats]").forEach(chart => {
+        chart._dcentQcStatsState?.destroy();
+      });
+      scope.querySelectorAll("[data-dcent-qc-temperature]").forEach(chart => {
+        chart._dcentQcTemperatureState?.destroy();
+      });
+    }
+
+    window.addEventListener("version-update-article-opened", event => {
+      initialiseMaps(event.detail?.root);
+    });
+    window.addEventListener("version-update-article-closed", event => {
+      disposeMaps(event.detail?.root);
+    });
+  })();
+</script>

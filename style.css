@@ -344,7 +344,8 @@ hr { border: none; border-top: 1px solid rgb(218, 231, 245); margin: 1rem 0;}
 .version-update{height:100%}
 .version-update-card{appearance:none;display:flex;width:100%;min-height:12.25rem;height:100%;flex-direction:column;align-items:flex-start;padding:1.1rem;border:1px solid var(--b400);border-radius:12px;background:#fff;box-shadow:none;color:var(--b700);font:inherit;text-align:left;cursor:pointer;transition:background-color .2s ease,border-color .2s ease}
 .version-update-card:hover,.version-update-card:focus-visible{border-color:var(--b600);background:#f3f7ff;outline:none}
-.version-update-card-header{display:flex;width:100%;align-items:baseline;justify-content:space-between;gap:.65rem;margin-bottom:.75rem}
+.version-update-card-header{display:grid;width:100%;gap:.28rem;margin-bottom:.75rem}
+.version-update-release{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:.65rem}
 .version-update-product{color:var(--b900);font-size:1.1rem;font-weight:700}
 .version-update-version{color:#d23f3f;font-size:.95rem;font-weight:600;white-space:nowrap}
 .version-update-summary{display:block;flex:1;color:var(--b700);font-size:.96rem;line-height:1.45;text-align:left}
