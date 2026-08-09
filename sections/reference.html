@@ -1,6 +1,6 @@
 <div class="container">
 
-  <h1>Reference & Guidance</h1>
+  <h1>Reference | Updates | Guidance</h1>
 
   <p style="padding-left: 4ch; text-indent: -4ch;">
     📚 <B style="font-weight: 600; color:#d23f3f">DCENT-I</B>: <span data-ref="chan2026dcenti"></span>
@@ -11,5 +11,20 @@
   </p>
 
   <p> More guidance can be found in this <a href="https://climatedataguide.ucar.edu/climate-data/dcent">📝 NCAR climate data guide page</a>.</p>
+
+  <section class="version-updates" data-version-updates aria-label="Version updates">
+    <div class="version-updates-track" data-version-updates-track tabindex="0" aria-label="Version update cards">
+      <!-- Add one line like this for every new version, newest first. -->
+      <div class="version-update-slot" data-version-update-src="sections/version_updates/dcent-i-v1.1.1.0.html"></div>
+      <div class="version-update-slot" data-version-update-src="sections/version_updates/dcent-v1.1.0.0.html"></div>
+    </div>
+
+    <dialog class="version-update-dialog" data-version-update-dialog aria-label="Version update details">
+      <div class="version-update-dialog-panel">
+        <button class="version-update-dialog-close" type="button" data-version-update-close aria-label="Close version update">×</button>
+        <div class="version-update-dialog-content" data-version-update-dialog-content></div>
+      </div>
+    </dialog>
+  </section>
   
 </div>
