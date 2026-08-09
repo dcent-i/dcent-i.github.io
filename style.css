@@ -337,7 +337,7 @@ width:100%; height:auto; aspect-ratio:1/1; object-fit:cover; border-radius:8px; 
 hr { border: none; border-top: 1px solid rgb(218, 231, 245); margin: 1rem 0;}
 
 /* Version update cards and article dialog */
-.version-updates{margin-top:2rem;padding-top:1.4rem;border-top:1px solid var(--b100)}
+.version-updates{margin-top:1.5rem;padding-top:0}
 .version-update-dialog-close:focus,.version-update-dialog-close:focus-visible{outline:none}
 .version-updates-track{display:flex;gap:1rem;overflow-x:auto;overscroll-behavior-x:contain;padding:.25rem .15rem .85rem;scroll-behavior:smooth;scroll-snap-type:x proximity;scrollbar-color:var(--b400) transparent;scrollbar-width:thin}
 .version-update-slot{flex:0 0 32%;min-width:17rem;scroll-snap-align:start}
