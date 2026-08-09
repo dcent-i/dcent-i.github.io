@@ -1,6 +1,6 @@
 const refs = {
 
-    chan2026dcenti: `<u><B style="font-weight: 550;">Chan D.</B></u>, Chan, S. C., Siddons, J. T., Cable, A., Faulkner, A., Cornes, R. C., Kent, E. C., Gebbie, G., & Huybers, P. (2026).
+    chan2026dcenti: `Chan D., Chan, S. C., Siddons, J. T., Cable, A., Faulkner, A., Cornes, R. C., Kent, E. C., Gebbie, G., & Huybers, P. (2026).
         DCENT‐I: A Globally Infilled Extension of the Dynamically Consistent ENsemble of Temperature Dataset.
         <b style="font-weight: 550;"><i>Geoscience Data Journal</i></b>, 13(2), e70054.
         <a href="https://doi.org/10.1002/gdj3.70054" class="link-light">link</a>,
