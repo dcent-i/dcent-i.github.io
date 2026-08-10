@@ -118,8 +118,20 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // === 3. 辅助函数 (Offset & Scroll) ===
+function usesCollapsibleNavigation(){
+    return window.matchMedia
+        ? window.matchMedia('(max-width: 1024px) and (orientation: portrait)').matches
+        : window.innerWidth <= 640;
+}
+
+function usesLandscapeMobileNavigation(){
+    return window.matchMedia
+        ? window.matchMedia('(max-width: 1024px) and (orientation: landscape)').matches
+        : false;
+}
+
 function getTopOffset(){
-    return window.innerWidth <= 640 ? 70 : 0; 
+    return usesCollapsibleNavigation() ? 70 : 0;
 }
 
 function smoothScrollTo(sel){
@@ -132,11 +144,26 @@ function smoothScrollTo(sel){
 
 // === 4. 导航栏交互逻辑 ===
 var btn = document.querySelector('.menu-toggle');
+function closeNavigation(){
+    document.body.classList.remove('nav-open');
+    if(btn) btn.setAttribute('aria-expanded','false');
+}
+
 if (btn) {
     btn.addEventListener('click', function(){
         document.body.classList.toggle('nav-open');
         btn.setAttribute('aria-expanded', document.body.classList.contains('nav-open'));
     });
+}
+
+if (window.matchMedia) {
+    var navigationMode = window.matchMedia('(max-width: 1024px) and (orientation: portrait)');
+    var resetNavigation = function(){
+        closeNavigation();
+        syncToolNavigation(currentId);
+    };
+    if (navigationMode.addEventListener) navigationMode.addEventListener('change', resetNavigation);
+    else if (navigationMode.addListener) navigationMode.addListener(resetNavigation);
 }
 
 var links = document.querySelectorAll('.sidenav ul a');
@@ -147,10 +174,7 @@ for (var i = 0; i < links.length; i++){
         smoothScrollTo(target);
         var id = target && target.charAt(0)==='#' ? target.slice(1) : null;
         if (id) setActive(id);
-        if (window.innerWidth <= 640){ 
-            document.body.classList.remove('nav-open'); 
-            if(btn) btn.setAttribute('aria-expanded','false'); 
-        }
+        if (usesCollapsibleNavigation()) closeNavigation();
     });
 }
 
@@ -165,7 +189,18 @@ for(var i = 0; i < links.length; i++){
 }
 
 var currentId = null;
+function syncToolNavigation(id){
+    var shouldCollapse = id === 'tool' && usesLandscapeMobileNavigation();
+    document.body.classList.toggle('tool-nav-collapsed', shouldCollapse);
+    var sidenav = document.querySelector('nav.sidenav');
+    if (!sidenav) return;
+    sidenav.inert = shouldCollapse;
+    if (shouldCollapse) sidenav.setAttribute('aria-hidden','true');
+    else sidenav.removeAttribute('aria-hidden');
+}
+
 function setActive(id){
+    syncToolNavigation(id);
     if(id === currentId) return;
     currentId = id;
     for (var m = 0; m < links.length; m++) links[m].removeAttribute('aria-current');
