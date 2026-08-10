@@ -340,7 +340,10 @@ hr { border: none; border-top: 1px solid rgb(218, 231, 245); margin: 1rem 0;}
 .version-updates{margin-top:1.5rem;padding-top:0}
 .version-update-dialog-close:focus,.version-update-dialog-close:focus-visible{outline:none}
 .version-updates-track{display:flex;gap:1rem;overflow-x:auto;overscroll-behavior-x:contain;padding:.25rem .15rem .85rem;scroll-behavior:smooth;scroll-snap-type:x proximity;scrollbar-color:var(--b400) transparent;scrollbar-width:thin}
-.version-update-slot{flex:0 0 32%;min-width:17rem;scroll-snap-align:start}
+.version-update-slot{position:relative;flex:0 0 32%;min-width:17rem;min-height:12.25rem;scroll-snap-align:start}
+.version-update-slot[aria-busy="true"]{overflow:hidden;border:1px solid #dbe5f7;border-radius:12px;background:#f7f9fd}
+.version-update-slot[aria-busy="true"]::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,rgba(255,255,255,.78) 45%,transparent 70%);transform:translateX(-100%);animation:version-update-loading 1.25s ease-in-out infinite}
+@keyframes version-update-loading{to{transform:translateX(100%)}}
 .version-update{height:100%}
 .version-update-card{appearance:none;display:flex;width:100%;min-height:12.25rem;height:100%;flex-direction:column;align-items:flex-start;padding:1.1rem;border:1px solid var(--b400);border-radius:12px;background:#fff;box-shadow:none;color:var(--b700);font:inherit;text-align:left;cursor:pointer;transition:background-color .2s ease,border-color .2s ease}
 .version-update-card:hover,.version-update-card:focus-visible{border-color:var(--b600);background:#f3f7ff;outline:none}
@@ -366,13 +369,14 @@ hr { border: none; border-top: 1px solid rgb(218, 231, 245); margin: 1rem 0;}
 .version-update-article h3{margin-top:1.4rem}
 .version-update-article p,.version-update-article li{color:#506a9f}
 .version-update-article p:last-child{margin-bottom:0}
+.version-update-article figure,.version-update-article .float-img{content-visibility:auto;contain-intrinsic-size:auto 420px}
 .version-update-modal-open{overflow:hidden}
 @media (max-width:640px){
   .version-update-slot{flex-basis:86%;min-width:15rem}
   .version-update-dialog-panel{padding:2rem 1.25rem 1.5rem}
   .version-update-dialog-close{margin:-1.15rem -.35rem .5rem .7rem}
 }
-@media (prefers-reduced-motion:reduce){.version-updates-track{scroll-behavior:auto}.version-update-card,.version-update-dialog::before,.version-update-dialog::backdrop,.version-update-dialog-panel{transition:none!important}}
+@media (prefers-reduced-motion:reduce){.version-updates-track{scroll-behavior:auto}.version-update-slot[aria-busy="true"]::after{animation:none}.version-update-card,.version-update-dialog::before,.version-update-dialog::backdrop,.version-update-dialog-panel{transition:none!important}}
 
 /* Parent link active: dot on, no background */
 .sidenav .group > a[aria-current="true"]{

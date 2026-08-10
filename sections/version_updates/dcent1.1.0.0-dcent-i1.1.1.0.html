@@ -562,10 +562,29 @@
     const ROBINSON_Y_SCALE = 1.3523;
     const WORLD_BOUNDARIES_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
     const gridPromises = new Map();
+    let dataController = new AbortController();
     let boundaryPromise;
     let qcPointsPromise;
     let qcStatsPromise;
     let temperatureStatsPromise;
+    let visualisationObserver;
+
+    function fetchText(url, errorMessage) {
+      return fetch(url, { signal: dataController.signal }).then(response => {
+        if (!response.ok) throw new Error(errorMessage);
+        return response.text();
+      });
+    }
+
+    function purgeSessionData() {
+      dataController.abort();
+      dataController = new AbortController();
+      gridPromises.clear();
+      boundaryPromise = undefined;
+      qcPointsPromise = undefined;
+      qcStatsPromise = undefined;
+      temperatureStatsPromise = undefined;
+    }
 
     function parseGrid(text) {
       const rows = text
@@ -590,12 +609,10 @@
 
     function loadGrid(platform) {
       if (!gridPromises.has(platform)) {
-        gridPromises.set(platform, fetch(FILES[platform])
-          .then(response => {
-            if (!response.ok) throw new Error("The January data file could not be loaded.");
-            return response.text();
-          })
-          .then(parseGrid));
+        gridPromises.set(platform, fetchText(
+          FILES[platform],
+          "The January data file could not be loaded."
+        ).then(parseGrid));
       }
       return gridPromises.get(platform);
     }
@@ -610,38 +627,43 @@
     }
 
     function parseQcPoints(text) {
-      const points = text
-        .replace(/\r/g, "")
-        .split("\n")
-        .map(line => line.trim())
-        .filter(Boolean)
-        .map(line => line.split(/\s+/).map(value => Number.parseFloat(value)))
-        .filter(values => values.length >= 4 && values.slice(0, 4).every(Number.isFinite))
-        .map(([longitude, latitude, anomaly, platform]) => ({
-          longitude: normaliseLongitude(longitude),
-          latitude,
-          anomaly,
-          platform
-        }));
-
-      if (!points.length) throw new Error("The June 2026 QC file contains no valid observations.");
-
       const groups = ANOMALY_COLOURS.map(() => ({ ship: [], buoy: [] }));
-      points.forEach(point => {
-        const platform = point.platform === QC_PLATFORM_CODES.buoy ? "buoy" : "ship";
-        groups[anomalyColourIndex(point.anomaly)][platform].push(point);
+      const number = "([-+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][-+]?\\d+)?)";
+      const rowPattern = new RegExp(
+        "^\\s*" + number + "\\s+" + number + "\\s+" + number + "\\s+" + number,
+        "gm"
+      );
+      let match;
+      let pointCount = 0;
+
+      // Parse one row at a time. The previous split/map pipeline retained more than
+      // 100,000 strings, arrays and point objects at the same time in Safari.
+      while ((match = rowPattern.exec(text)) !== null) {
+        const longitude = Number.parseFloat(match[1]);
+        const latitude = Number.parseFloat(match[2]);
+        const anomaly = Number.parseFloat(match[3]);
+        const platformCode = Number.parseFloat(match[4]);
+        if (![longitude, latitude, anomaly, platformCode].every(Number.isFinite)) continue;
+        const platform = platformCode === QC_PLATFORM_CODES.buoy ? "buoy" : "ship";
+        groups[anomalyColourIndex(anomaly)][platform].push(normaliseLongitude(longitude), latitude);
+        pointCount += 1;
+      }
+
+      if (!pointCount) throw new Error("The June 2026 QC file contains no valid observations.");
+
+      groups.forEach(group => {
+        group.ship = Float32Array.from(group.ship);
+        group.buoy = Float32Array.from(group.buoy);
       });
-      return { groups };
+      return { groups, pointCount };
     }
 
     function loadQcPoints() {
       if (!qcPointsPromise) {
-        qcPointsPromise = fetch(QC_POINTS_URL)
-          .then(response => {
-            if (!response.ok) throw new Error("The June 2026 QC file could not be loaded.");
-            return response.text();
-          })
-          .then(parseQcPoints);
+        qcPointsPromise = fetchText(
+          QC_POINTS_URL,
+          "The June 2026 QC file could not be loaded."
+        ).then(parseQcPoints);
       }
       return qcPointsPromise;
     }
@@ -666,12 +688,10 @@
 
     function loadQcStats() {
       if (!qcStatsPromise) {
-        qcStatsPromise = fetch(QC_STATS_URL)
-          .then(response => {
-            if (!response.ok) throw new Error("The annual QC statistics file could not be loaded.");
-            return response.text();
-          })
-          .then(parseQcStats);
+        qcStatsPromise = fetchText(
+          QC_STATS_URL,
+          "The annual QC statistics file could not be loaded."
+        ).then(parseQcStats);
       }
       return qcStatsPromise;
     }
@@ -716,12 +736,10 @@
 
     function loadTemperatureStats() {
       if (!temperatureStatsPromise) {
-        temperatureStatsPromise = fetch(TEMPERATURE_STATS_URL)
-          .then(response => {
-            if (!response.ok) throw new Error("The annual temperature statistics file could not be loaded.");
-            return response.text();
-          })
-          .then(parseTemperatureStats);
+        temperatureStatsPromise = fetchText(
+          TEMPERATURE_STATS_URL,
+          "The annual temperature statistics file could not be loaded."
+        ).then(parseTemperatureStats);
       }
       return temperatureStatsPromise;
     }
@@ -767,11 +785,7 @@
 
     function loadBoundaries() {
       if (!boundaryPromise) {
-        boundaryPromise = fetch(WORLD_BOUNDARIES_URL)
-          .then(response => {
-            if (!response.ok) throw new Error("World boundaries are unavailable.");
-            return response.text();
-          })
+        boundaryPromise = fetchText(WORLD_BOUNDARIES_URL, "World boundaries are unavailable.")
           .then(parseBoundaryPaths)
           .catch(() => ({ coastlines: [], borders: [] }));
       }
@@ -999,14 +1013,30 @@
         } else {
           status.hidden = false;
           status.textContent = "Loading " + platform + " January estimates…";
+          loadGrid(platform)
+            .then(grid => {
+              if (destroyed) return;
+              grids[nextPlatform] = grid;
+              if (platform === nextPlatform) {
+                status.hidden = true;
+                scheduleRender();
+              }
+            })
+            .catch(error => {
+              if (!destroyed && error.name !== "AbortError" && platform === nextPlatform) {
+                status.hidden = false;
+                status.textContent = "The January " + nextPlatform + " estimates could not be loaded.";
+              }
+            });
         }
       }
 
       const resizeObserver = new ResizeObserver(scheduleRender);
       resizeObserver.observe(map);
-      buttons.forEach(button => {
-        button.addEventListener("click", () => selectPlatform(button.dataset.dcentSigmaPlatform));
-      });
+      function onPlatformButtonClick(event) {
+        selectPlatform(event.currentTarget.dataset.dcentSigmaPlatform);
+      }
+      buttons.forEach(button => button.addEventListener("click", onPlatformButtonClick));
 
       function endDrag(event) {
         if (!drag || event.pointerId !== drag.pointerId) return;
@@ -1047,47 +1077,27 @@
           destroyed = true;
           resizeObserver.disconnect();
           if (frame !== undefined) cancelAnimationFrame(frame);
+          buttons.forEach(button => button.removeEventListener("click", onPlatformButtonClick));
           canvas.removeEventListener("pointerdown", startDrag);
           canvas.removeEventListener("pointermove", moveMap);
           canvas.removeEventListener("pointerup", endDrag);
           canvas.removeEventListener("pointercancel", endDrag);
           canvas.removeEventListener("lostpointercapture", endDrag);
+          canvas.width = 0;
+          canvas.height = 0;
+          grids = {};
+          boundaries = { coastlines: [], borders: [] };
+          drag = undefined;
+          map._dcentSigmaMapState = undefined;
         }
       };
 
-      loadGrid("ship")
-        .then(grid => {
-          grids.ship = grid;
-          if (!destroyed && platform === "ship") {
-            status.hidden = true;
-            scheduleRender();
-          }
-        })
-        .catch(() => {
-          if (!destroyed && platform === "ship") {
-            status.hidden = false;
-            status.textContent = "The January ship estimates could not be loaded.";
-          }
-        });
-      loadGrid("buoy")
-        .then(grid => {
-          grids.buoy = grid;
-          if (!destroyed && platform === "buoy") {
-            status.hidden = true;
-            scheduleRender();
-          }
-        })
-        .catch(() => {
-          if (!destroyed && platform === "buoy") {
-            status.hidden = false;
-            status.textContent = "The January buoy estimates could not be loaded.";
-          }
-        });
       loadBoundaries().then(paths => {
+        if (destroyed) return;
         boundaries = paths;
         scheduleRender();
       });
-      requestAnimationFrame(scheduleRender);
+      selectPlatform(platform);
     }
 
     function drawAnomalyGrid(context, project, grid, centralLongitude) {
@@ -1141,8 +1151,8 @@
           const isBuoy = platform === "buoy";
           const radius = isBuoy ? buoyRadius : shipRadius;
           context.beginPath();
-          points.forEach(point => {
-            const position = project(relativeLongitude(point.longitude, centralLongitude), point.latitude);
+          for (let index = 0; index < points.length; index += 2) {
+            const position = project(relativeLongitude(points[index], centralLongitude), points[index + 1]);
             if (isBuoy) {
               context.moveTo(position.x, position.y - radius);
               context.lineTo(position.x + radius, position.y);
@@ -1153,7 +1163,7 @@
               context.moveTo(position.x + radius, position.y);
               context.arc(position.x, position.y, radius, 0, Math.PI * 2);
             }
-          });
+          }
           context.fillStyle = ANOMALY_COLOURS[colourIndex];
           context.globalAlpha = isBuoy ? QC_SCATTER_MARKER_OPACITY.buoy : QC_SCATTER_MARKER_OPACITY.ship;
           context.fill();
@@ -1260,14 +1270,15 @@
         status.textContent = "Loading June 2026 " + (configuration.type === "points" ? "QC observations…" : "gridded anomalies…");
         configuration.load()
           .then(result => {
+            if (destroyed) return;
             data[nextMode] = result;
-            if (!destroyed && mode === nextMode) {
+            if (mode === nextMode) {
               status.hidden = true;
               scheduleRender();
             }
           })
-          .catch(() => {
-            if (!destroyed && mode === nextMode) {
+          .catch(error => {
+            if (!destroyed && error.name !== "AbortError" && mode === nextMode) {
               status.hidden = false;
               status.textContent = "This June 2026 map could not be loaded.";
             }
@@ -1337,10 +1348,17 @@
           canvas.removeEventListener("pointerup", endDrag);
           canvas.removeEventListener("pointercancel", endDrag);
           canvas.removeEventListener("lostpointercapture", endDrag);
+          canvas.width = 0;
+          canvas.height = 0;
+          Object.keys(data).forEach(key => delete data[key]);
+          boundaries = { coastlines: [], borders: [] };
+          drag = undefined;
+          map._dcentQcMapState = undefined;
         }
       };
 
       loadBoundaries().then(paths => {
+        if (destroyed) return;
         boundaries = paths;
         scheduleRender();
       });
@@ -1524,19 +1542,22 @@
           resizeObserver.disconnect();
           if (frame !== undefined) cancelAnimationFrame(frame);
           buttons.forEach(button => button.removeEventListener("click", onViewButtonClick));
+          canvas.width = 0;
+          canvas.height = 0;
+          rows = undefined;
+          chart._dcentQcStatsState = undefined;
         }
       };
 
       loadQcStats()
         .then(data => {
+          if (destroyed) return;
           rows = data;
-          if (!destroyed) {
-            status.hidden = true;
-            scheduleRender();
-          }
+          status.hidden = true;
+          scheduleRender();
         })
-        .catch(() => {
-          if (!destroyed) {
+        .catch(error => {
+          if (!destroyed && error.name !== "AbortError") {
             status.hidden = false;
             status.textContent = "The annual measurement counts could not be loaded.";
           }
@@ -1808,34 +1829,64 @@
           resizeObserver.disconnect();
           if (frame !== undefined) cancelAnimationFrame(frame);
           buttons.forEach(button => button.removeEventListener("click", onViewButtonClick));
+          canvas.width = 0;
+          canvas.height = 0;
+          rows = undefined;
+          chart._dcentQcTemperatureState = undefined;
         }
       };
 
       loadTemperatureStats()
         .then(data => {
+          if (destroyed) return;
           rows = data;
-          if (!destroyed) {
-            status.hidden = true;
-            scheduleRender();
-          }
+          status.hidden = true;
+          scheduleRender();
         })
-        .catch(() => {
-          if (!destroyed) {
+        .catch(error => {
+          if (!destroyed && error.name !== "AbortError") {
             status.hidden = false;
             status.textContent = "The annual temperature statistics could not be loaded.";
           }
         });
     }
 
-    function initialiseMaps(scope) {
+    function initialiseVisualisations(scope, scrollRoot) {
       if (!scope) return;
-      scope.querySelectorAll("[data-dcent-sigma-map]").forEach(initialiseMap);
-      scope.querySelectorAll("[data-dcent-qc-map]").forEach(initialiseQcMap);
-      scope.querySelectorAll("[data-dcent-qc-stats]").forEach(initialiseQcStats);
-      scope.querySelectorAll("[data-dcent-qc-temperature]").forEach(initialiseTemperatureChart);
+      const targets = [...scope.querySelectorAll(
+        "[data-dcent-sigma-map], [data-dcent-qc-map], [data-dcent-qc-stats], [data-dcent-qc-temperature]"
+      )];
+      if (!targets.length) return;
+
+      const initialise = target => {
+        if (target.matches("[data-dcent-sigma-map]")) initialiseMap(target);
+        else if (target.matches("[data-dcent-qc-map]")) initialiseQcMap(target);
+        else if (target.matches("[data-dcent-qc-stats]")) initialiseQcStats(target);
+        else if (target.matches("[data-dcent-qc-temperature]")) initialiseTemperatureChart(target);
+      };
+
+      visualisationObserver?.disconnect();
+      if (typeof IntersectionObserver !== "function") {
+        targets.forEach(initialise);
+        return;
+      }
+
+      visualisationObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          visualisationObserver.unobserve(entry.target);
+          initialise(entry.target);
+        });
+      }, {
+        root: scrollRoot || scope.closest(".version-update-dialog-panel"),
+        rootMargin: "650px 0px"
+      });
+      targets.forEach(target => visualisationObserver.observe(target));
     }
 
-    function disposeMaps(scope) {
+    function disposeVisualisations(scope) {
+      visualisationObserver?.disconnect();
+      visualisationObserver = undefined;
       if (!scope) return;
       scope.querySelectorAll("[data-dcent-sigma-map]").forEach(map => {
         map._dcentSigmaMapState?.destroy();
@@ -1849,13 +1900,14 @@
       scope.querySelectorAll("[data-dcent-qc-temperature]").forEach(chart => {
         chart._dcentQcTemperatureState?.destroy();
       });
+      purgeSessionData();
     }
 
     window.addEventListener("version-update-article-opened", event => {
-      initialiseMaps(event.detail?.root);
+      initialiseVisualisations(event.detail?.root, event.detail?.scrollRoot);
     });
     window.addEventListener("version-update-article-closed", event => {
-      disposeMaps(event.detail?.root);
+      disposeVisualisations(event.detail?.root);
     });
   })();
 </script>

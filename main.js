@@ -24,11 +24,37 @@ function renderReferences(scope = document) {
     });
 }
 
+function initialiseDeferredFrames(scope = document) {
+    const frames = [...scope.querySelectorAll('iframe[data-deferred-src]')];
+    if (!frames.length) return;
+
+    const loadFrame = frame => {
+        if (!frame.dataset.deferredSrc) return;
+        frame.src = frame.dataset.deferredSrc;
+        frame.removeAttribute('data-deferred-src');
+    };
+
+    if (typeof IntersectionObserver !== 'function') {
+        frames.forEach(loadFrame);
+        return;
+    }
+
+    const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            observer.unobserve(entry.target);
+            loadFrame(entry.target);
+        });
+    }, { rootMargin: '800px 0px' });
+    frames.forEach(frame => observer.observe(frame));
+}
+
 // === 2. 页面加载核心逻辑 (Include Loader) ===
 document.addEventListener("DOMContentLoaded", () => {
     
     // 2.1 先尝试渲染主页面上原本就有的文献引用
     renderReferences();
+    initialiseDeferredFrames();
 
     // 2.2 处理动态引入 (include-html)
     const elements = document.querySelectorAll('[include-html]');
