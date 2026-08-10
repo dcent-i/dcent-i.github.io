@@ -674,6 +674,8 @@
 
         host.replaceChildren();
         const svg = svgEl('svg', {
+            width,
+            height,
             viewBox: `0 0 ${width} ${height}`,
             role: 'img',
             'aria-label': `Annual global mean surface temperature anomalies, ${firstYear} to ${lastYear}`
@@ -1050,6 +1052,8 @@
             const recordsByYear = new Map(dataset.records.map(record => [record.year, record]));
 
             const svg = svgEl('svg', {
+                width,
+                height,
                 viewBox: `0 0 ${width} ${height}`,
                 role: 'img',
                 'aria-label': `Monthly global mean surface temperature anomalies for ${dataset.label}, ${firstYear} to ${lastYear}`
@@ -1386,6 +1390,8 @@
 
         host.replaceChildren();
         const svg = svgEl('svg', {
+            width,
+            height,
             viewBox: `0 0 ${width} ${height}`,
             role: 'img',
             'aria-label': `DCENT-I global mean surface temperature warming stripes, ${firstYear} to ${lastYear}`
@@ -1575,28 +1581,36 @@
             if (motionFrame === null) motionFrame = requestAnimationFrame(renderSilkWave);
         }
 
-        hitArea.addEventListener('pointermove', setWaveTarget);
         const carouselViewport = host.closest('.dashboard-carousel-viewport');
-        carouselViewport?.addEventListener('pointermove', event => {
-            const stripeBounds = hitArea.getBoundingClientRect();
-            const horizontalActivationDistance = waveEntryDistance * (stripeBounds.width / chartWidth);
-            const horizontalDistance = event.clientX < stripeBounds.left
-                ? stripeBounds.left - event.clientX
-                : event.clientX > stripeBounds.right
-                    ? event.clientX - stripeBounds.right
-                    : 0;
-            const isVerticallyAligned = event.clientY >= stripeBounds.top && event.clientY <= stripeBounds.bottom;
-            if (isVerticallyAligned && horizontalDistance <= horizontalActivationDistance) {
+        const hoverWaveSupported = typeof window.matchMedia !== 'function'
+            || window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+        if (hoverWaveSupported) {
+            hitArea.addEventListener('pointermove', event => {
+                if (event.pointerType && event.pointerType !== 'mouse') return;
                 setWaveTarget(event);
-            } else if (!isVerticallyAligned) {
+            });
+            carouselViewport?.addEventListener('pointermove', event => {
+                if (event.pointerType && event.pointerType !== 'mouse') return;
+                const stripeBounds = hitArea.getBoundingClientRect();
+                const horizontalActivationDistance = waveEntryDistance * (stripeBounds.width / chartWidth);
+                const horizontalDistance = event.clientX < stripeBounds.left
+                    ? stripeBounds.left - event.clientX
+                    : event.clientX > stripeBounds.right
+                        ? event.clientX - stripeBounds.right
+                        : 0;
+                const isVerticallyAligned = event.clientY >= stripeBounds.top && event.clientY <= stripeBounds.bottom;
+                if (isVerticallyAligned && horizontalDistance <= horizontalActivationDistance) {
+                    setWaveTarget(event);
+                } else if (!isVerticallyAligned) {
+                    flattenWaveInPlace();
+                } else {
+                    moveWaveOut(event.clientX < stripeBounds.left ? -1 : 1);
+                }
+            });
+            carouselViewport?.addEventListener('pointerleave', () => {
                 flattenWaveInPlace();
-            } else {
-                moveWaveOut(event.clientX < stripeBounds.left ? -1 : 1);
-            }
-        });
-        carouselViewport?.addEventListener('pointerleave', () => {
-            flattenWaveInPlace();
-        });
+            });
+        }
 
         host.appendChild(svg);
     }
@@ -2258,7 +2272,7 @@
                             <span style="left:0%">−5</span><span style="left:10%">−4</span><span style="left:20%">−3</span><span style="left:30%">−2</span><span style="left:40%">−1</span><span style="left:50%">0</span><span style="left:60%">1</span><span style="left:70%">2</span><span style="left:80%">3</span><span style="left:90%">4</span><span style="left:100%">5</span>
                         </div>
                     </div>
-                    <p class="dashboard-spatial-legend-description">Temperature anomalies relative to the 1850–1900 mean (°C)</p>`;
+                    <p class="dashboard-spatial-legend-description">T anomalies relative to the 1850–1900 mean (°C)</p>`;
                 return;
             }
 
