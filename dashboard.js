@@ -422,6 +422,37 @@
         label.textContent = `${formatMonth(coverage.start)} – ${formatMonth(coverage.end)}`;
     }
 
+    function updateLiveAnnualProvisionalNotice(datasets) {
+        const notice = document.querySelector('[data-live-annual-provisional]');
+        if (!notice) return;
+
+        const products = datasets.filter(dataset => dataset.coverage?.end);
+        const provisionalProducts = products.filter(dataset => dataset.coverage.end.monthIndex < 11);
+        if (!provisionalProducts.length) {
+            notice.hidden = true;
+            notice.textContent = '';
+            return;
+        }
+
+        const sameCoverageEnd = provisionalProducts.length === products.length
+            && provisionalProducts.every(dataset => (
+                dataset.coverage.end.year === provisionalProducts[0].coverage.end.year
+                && dataset.coverage.end.monthIndex === provisionalProducts[0].coverage.end.monthIndex
+            ));
+
+        if (sameCoverageEnd) {
+            const { year, monthIndex } = provisionalProducts[0].coverage.end;
+            notice.textContent = ` Annual values for ${year} are the average over January to ${MONTH_NAMES[monthIndex]} and hence provisional.`;
+        } else {
+            const descriptions = provisionalProducts.map(dataset => {
+                const { year, monthIndex } = dataset.coverage.end;
+                return `${dataset.label} ${year} values average January to ${MONTH_NAMES[monthIndex]}`;
+            });
+            notice.textContent = ` Provisional annual values: ${descriptions.join('; ')}.`;
+        }
+        notice.hidden = false;
+    }
+
     function alignMonthlyToAnnualReference(datasets, annualOffset, annualReferenceDeltas) {
         if (!Number.isFinite(annualOffset)) {
             throw new Error('The annual alignment offset is unavailable.');
@@ -2687,6 +2718,14 @@
         let currentAnnualRanking;
         let selectedMonthlyProduct = dashboardState.monthlyProduct === 'dcent' ? 'dcent' : 'dcentI';
 
+        // Includes load in parallel. If the live Access fragment arrives after
+        // the monthly data, populate its notice as soon as the fragment exists.
+        document.addEventListener('include-html-loaded', event => {
+            if (event.detail?.file === 'sections/access_live.html' && monthlyRawDatasets) {
+                updateLiveAnnualProvisionalNotice(monthlyRawDatasets);
+            }
+        });
+
         function updateAnnualSubtitle() {
             if (!currentAnnualRanking) return;
 
@@ -2815,6 +2854,7 @@
             .then(datasets => {
                 monthlyRawDatasets = datasets;
                 updateSidebarCoverage(datasets);
+                updateLiveAnnualProvisionalNotice(datasets);
                 updateAnnualSubtitle();
                 renderMonthlyWhenReady();
             })
