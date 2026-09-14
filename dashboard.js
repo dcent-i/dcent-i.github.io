@@ -10,8 +10,8 @@
             monthly: 'https://dl.dropboxusercontent.com/scl/fi/fuirz2t34i421d2nsehkr/DCENT_DCENT_I_GMST_monthly_statistics.txt?rlkey=yvh9slt1buw6ptx56rkpuwzhc&st=fkbmn0c9&dl=0'
         },
         live: {
-            annual: 'https://dl.dropboxusercontent.com/scl/fi/omvhfj0h14m7xkilu0vpu/DCENT_DCENT_I_GMST_annual_statistics_live.txt?rlkey=fzipvcjjky2bp4kjrkirj7cgp&dl=0',
-            monthly: 'https://dl.dropboxusercontent.com/scl/fi/u1r6bey4apyg92ni9ynqj/DCENT_DCENT_I_GMST_monthly_statistics_live.txt?rlkey=d6hswqpedyfrat6n67avfk6ma&dl=0'
+            annual: 'https://dl.dropboxusercontent.com/scl/fi/bszbjro6sb2sqffwp0247/DCENT_DCENT_I_GMST_annual_statistics_live.txt?rlkey=mwj0mrgxnwepzrydvz1lcspwb&st=ff9cezb2&dl=0',
+            monthly: 'https://dl.dropboxusercontent.com/scl/fi/mimwytmk3412qus4h6e4s/DCENT_DCENT_I_GMST_monthly_statistics_live.txt?rlkey=b53fz5qzh4spsgpjz6otgewk3&dl=0'
         }
     };
     const BERKELEY_LIVE_DATA_URL = 'https://storage.googleapis.com/storage/v1/b/berkeley-earth-temperature-hr/o/global%2FGlobal_TAVG_annual.txt?alt=media';
