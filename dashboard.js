@@ -1863,7 +1863,6 @@
             function clearHighlight() {
                 if (!highlightedState) return;
                 lineStates.forEach(applyRestingStyle);
-                latestPointLayer.style.opacity = '1';
                 hoverPointLayer.replaceChildren();
                 hoverGridLines.forEach(line => { line.style.opacity = '0'; });
                 yearKeyHighlight.setAttribute('visibility', 'hidden');
@@ -1889,17 +1888,12 @@
             function highlight(state, event) {
                 if (highlightedState !== state) {
                     highlightedState = state;
-                    lineStates.forEach(candidate => {
-                        const isHighlighted = candidate === state;
-                        candidate.line.style.stroke = isHighlighted ? candidate.highlightColor : candidate.color;
-                        candidate.line.style.strokeWidth = isHighlighted
-                            ? String(Math.max(2.9, restingStrokeWidth(candidate.record.year) + 0.65))
-                            : '1.0';
-                        candidate.line.style.opacity = isHighlighted ? '1' : '0.32';
-                    });
+                    lineStates.forEach(applyRestingStyle);
+                    state.line.style.stroke = state.highlightColor;
+                    state.line.style.strokeWidth = String(Math.max(2.9, restingStrokeWidth(state.record.year) + 0.65));
+                    state.line.style.opacity = '1';
                     showHoverGrid();
                     lineLayer.appendChild(state.line);
-                    latestPointLayer.style.opacity = state.record.year === latestYear ? '1' : '0';
                     hoverPointLayer.replaceChildren();
                     state.record.months.forEach((value, monthIndex) => {
                         if (!Number.isFinite(value)) return;
@@ -3263,7 +3257,7 @@
             }
         });
 
-        if (activeIndex > 0) viewport.scrollLeft = slideScrollPosition(slides[activeIndex]);
+        if (activeIndex > 0) viewport.scrollTo({ left: slideScrollPosition(slides[activeIndex]), behavior: 'instant' });
         updateActive();
     }
 
@@ -3431,6 +3425,14 @@
                     <button class="dashboard-carousel-arrow" type="button" data-carousel-next aria-label="Next dashboard view">›</button>
                 </nav>
             </section>`;
+
+        // Shareable entry: ?card=nino&view=events#dashboard takes precedence over this tab's saved view.
+        const dashboardParams = new URLSearchParams(window.location.search);
+        if (dashboardParams.get('card') === 'nino') {
+            dashboardState.activeSlide = [...content.querySelectorAll('.dashboard-slide')]
+                .findIndex(slide => slide.querySelector('.dashboard-panel--nino'));
+            dashboardState.ninoChart = { view: dashboardParams.get('view') === 'events' ? 'events' : 'series', windowYear: null };
+        }
 
         const chartHost = content.querySelector('.dashboard-chart:not(.dashboard-monthly-chart)');
         const monthlyChartHost = content.querySelector('.dashboard-monthly-chart');
