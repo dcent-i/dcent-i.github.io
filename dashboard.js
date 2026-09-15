@@ -27,6 +27,8 @@
         annual: { other: [-0.6, 2.6], arctic: [-1.5, 3.5] },
         monthly: { other: [-1.3, 3.5], arctic: [-3, 6] }
     };
+    // 小地图相对绘图区左上角的位置（SVG 坐标）：x 增大向右，y 增大向下。
+    const REGIONAL_INSET_POSITION = { x: 14, y: -10 };
     const NOAA_LIVE_DATA_URL = 'https://www.ncei.noaa.gov/data/noaa-global-surface-temperature/v6.1/access/timeseries/aravg.ann.land_ocean.90S.90N.v6.1.0.202606.asc';
     const HADCRUT_LOCAL_DATA_URL = 'data/HadCRUT.5.1.0.0.analysis.summary_series.global.annual.csv';
     const GISS_LOCAL_DATA_URL = 'data/GLB.Ts%2BdSST.txt';
@@ -679,7 +681,9 @@
                 note.innerHTML = `
                     <span aria-hidden="${state.timeMode !== 'annual'}">${scope}. Anomalies relative to each product’s own 1850–1900 mean; incomplete years use matching baseline months. Shading: 95% c.i.</span>
                     <span aria-hidden="${state.timeMode !== 'monthly'}">${scope}. Anomalies relative to each product’s own 1850–1900 calendar-month means.</span>`;
-                renderChart(chartHost, datasets[state.timeMode], undefined, { ...state, scope, boundaryPaths });
+                const years = [...datasets.annual, ...datasets.monthly].flatMap(item => item.records.map(record => record.year));
+                const yearRange = [Math.floor(Math.min(...years)), Math.floor(Math.max(...years))];
+                renderChart(chartHost, datasets[state.timeMode], undefined, { ...state, scope, boundaryPaths, yearRange });
             } catch (error) {
                 if (id !== requestId) return;
                 chartHost.innerHTML = '<p class="dashboard-status error">Regional data could not be loaded. Select a region to try again.</p>';
@@ -815,10 +819,11 @@
         const height = margin.top + ANNUAL_CHART_PLOT_HEIGHT + margin.bottom;
         const chartWidth = width - margin.left - margin.right;
         const chartHeight = ANNUAL_CHART_PLOT_HEIGHT;
-        const firstYear = Math.floor(Math.min(...series.flatMap(item => item.records.map(record => record.year))));
-        const lastYear = Math.floor(Math.max(...series.flatMap(item => item.records.map(record => record.year))));
-        const xDomainStart = firstYear - (isMonthly ? 0 : 0.5);
-        const xDomainEnd = lastYear + (isMonthly ? 1 : 0.5);
+        const firstYear = regionalView ? regionalView.yearRange[0] : Math.floor(Math.min(...series.flatMap(item => item.records.map(record => record.year))));
+        const lastYear = regionalView ? regionalView.yearRange[1] : Math.floor(Math.max(...series.flatMap(item => item.records.map(record => record.year))));
+        const xDomainStart = firstYear - 0.5;
+        // Both regional time scales include the full final year, including December.
+        const xDomainEnd = lastYear + (regionalView ? 1 : 0.5);
         const majorGridStep = regionalView && isMonthly ? (regionalView.region === 'Arc' ? 2 : 1) : 0.5;
         const minorGridStep = regionalView && isMonthly ? 0.5 : 0.1;
         const [yMin, yMax] = regionalView
@@ -1150,7 +1155,8 @@
 
         focusSeries(regionalView ? regionalView.product : 'dcentI');
         if (regionalView?.boundaryPaths?.land) {
-            renderRegionalInset(svg, regionalView.region, regionalView.boundaryPaths, margin.left + 14, margin.top + 8);
+            renderRegionalInset(svg, regionalView.region, regionalView.boundaryPaths,
+                margin.left + REGIONAL_INSET_POSITION.x, margin.top + REGIONAL_INSET_POSITION.y);
             svg.appendChild(tooltip);
         }
         host.appendChild(svg);
@@ -1931,8 +1937,6 @@
         canvas.height = 360;
         const context = canvas.getContext('2d');
         const project = createRobinsonProjection(canvas.width, canvas.height);
-        context.fillStyle = '#fff';
-        context.fillRect(0, 0, canvas.width, canvas.height);
         context.save();
         clipToRobinsonOutline(context, project);
         context.fillStyle = '#f1f5f7';
@@ -1983,10 +1987,6 @@
             'pointer-events': 'none'
         });
         appendSvg(inset, 'image', { x, y, width: 240, height: 144, href: canvas.toDataURL('image/png') });
-        appendSvg(inset, 'text', {
-            x: x + 120, y: y + 150, 'text-anchor': 'middle',
-            fill: '#667594', 'font-family': 'Calibri, Arial, sans-serif', 'font-size': 17
-        }, 'Averaging region');
     }
 
     function parseWorldBoundaryPaths(text) {
@@ -2584,7 +2584,10 @@
                         <span></span>
                         <div class="dashboard-spatial-rank-tick-group"><span>top 5</span><span>3rd</span><span>2nd</span><span>1st</span></div>
                     </div>
-                </div>`;
+                </div>
+                <p class="dashboard-spatial-legend-description">${timeMode === 'monthly'
+                    ? `Ranks among ${MONTH_NAMES[frame.month - 1]}s at each grid cell · 1850–${frame.year}`
+                    : 'Ranks among annual means at each grid cell'}</p>`;
         }
 
         function loadFrameFor(key, url) {
@@ -2934,41 +2937,43 @@
                     </article>
                     <article class="dashboard-slide" aria-label="Regional temperature time series">
                         <section class="dashboard-panel dashboard-panel--regional">
-                            <div class="dashboard-regional-regions" role="group" aria-label="Choose a region">
-                                ${Object.entries(REGIONAL_SERIES).map(([key, region]) => `
-                                    <button class="dashboard-spatial-control${key === 'NHST' ? ' is-active' : ''}" type="button" data-regional-option="region" data-value="${key}" aria-pressed="${key === 'NHST'}">${region.label}</button>
-                                `).join('')}
+                            <div class="dashboard-regional-content">
+                                <div class="dashboard-regional-regions" role="group" aria-label="Choose a region">
+                                    ${Object.entries(REGIONAL_SERIES).map(([key, region]) => `
+                                        <button class="dashboard-spatial-control${key === 'NHST' ? ' is-active' : ''}" type="button" data-regional-option="region" data-value="${key}" aria-pressed="${key === 'NHST'}">${region.label}</button>
+                                    `).join('')}
+                                </div>
+                                <figure class="dashboard-figure">
+                                    <div class="dashboard-chart-frame">
+                                        <div class="dashboard-chart dashboard-regional-chart"><p class="dashboard-status">Loading regional temperature data…</p></div>
+                                    </div>
+                                    <div class="dashboard-regional-controls">
+                                        <div class="dashboard-spatial-control-group" role="group" aria-label="Choose the regional temperature product">
+                                            <button class="dashboard-spatial-control is-active" type="button" data-regional-option="product" data-value="dcentI" aria-pressed="true">DCENT-I</button>
+                                            <button class="dashboard-spatial-control" type="button" data-regional-option="product" data-value="dcent" aria-pressed="false">DCENT</button>
+                                        </div>
+                                        <div class="dashboard-spatial-control-group" role="group" aria-label="Choose the regional time scale">
+                                            <button class="dashboard-spatial-control is-active" type="button" data-regional-option="timeMode" data-value="annual" aria-pressed="true">Annual</button>
+                                            <button class="dashboard-spatial-control" type="button" data-regional-option="timeMode" data-value="monthly" aria-pressed="false">Monthly</button>
+                                        </div>
+                                    </div>
+                                    <figcaption class="dashboard-chart-note" data-regional-note></figcaption>
+                                </figure>
                             </div>
-                            <figure class="dashboard-figure">
-                                <div class="dashboard-chart-frame">
-                                    <div class="dashboard-chart dashboard-regional-chart"><p class="dashboard-status">Loading regional temperature data…</p></div>
-                                </div>
-                                <div class="dashboard-regional-controls">
-                                    <div class="dashboard-spatial-control-group" role="group" aria-label="Choose the regional temperature product">
-                                        <button class="dashboard-spatial-control is-active" type="button" data-regional-option="product" data-value="dcentI" aria-pressed="true">DCENT-I</button>
-                                        <button class="dashboard-spatial-control" type="button" data-regional-option="product" data-value="dcent" aria-pressed="false">DCENT</button>
-                                    </div>
-                                    <div class="dashboard-spatial-control-group" role="group" aria-label="Choose the regional time scale">
-                                        <button class="dashboard-spatial-control is-active" type="button" data-regional-option="timeMode" data-value="annual" aria-pressed="true">Annual</button>
-                                        <button class="dashboard-spatial-control" type="button" data-regional-option="timeMode" data-value="monthly" aria-pressed="false">Monthly</button>
-                                    </div>
-                                </div>
-                                <figcaption class="dashboard-chart-note" data-regional-note></figcaption>
-                            </figure>
                         </section>
                     </article>
                     <article class="dashboard-slide" aria-label="Spatial temperature maps">
                         <section class="dashboard-panel dashboard-panel--map" aria-label="Spatial temperature maps">
                             <div class="dashboard-spatial-map">
-                                <div class="dashboard-spatial-top-controls" role="group" aria-label="Choose the map time scale">
-                                    <button class="dashboard-spatial-control is-active" type="button" data-spatial-time="annual" aria-pressed="true">Annual</button>
-                                    <button class="dashboard-spatial-control" type="button" data-spatial-time="monthly" aria-pressed="false">Monthly</button>
-                                    <div class="dashboard-spatial-month-navigation" data-spatial-month-navigation aria-label="Browse recent monthly maps">
-                                        <button class="dashboard-spatial-step" type="button" data-spatial-previous-month aria-label="Previous month">‹</button>
-                                        <button class="dashboard-spatial-step" type="button" data-spatial-next-month aria-label="Next month">›</button>
-                                    </div>
+                                <div class="dashboard-spatial-top-controls" role="group" aria-label="Choose the map measure">
+                                    <button class="dashboard-spatial-control is-active" type="button" data-spatial-metric="signal" aria-pressed="true">Warming signal</button>
+                                    <button class="dashboard-spatial-control" type="button" data-spatial-metric="rank" aria-pressed="false">Temperature rank</button>
                                 </div>
-                                <p class="dashboard-spatial-period" data-spatial-period>Loading annual mean…</p>
+                                <div class="dashboard-spatial-month-navigation" role="group" data-spatial-month-navigation aria-label="Browse recent monthly maps">
+                                    <button class="dashboard-spatial-step" type="button" data-spatial-previous-month aria-label="Previous month">‹</button>
+                                    <p class="dashboard-spatial-period" data-spatial-period>Loading annual mean…</p>
+                                    <button class="dashboard-spatial-step" type="button" data-spatial-next-month aria-label="Next month">›</button>
+                                </div>
                                 <figure class="dashboard-figure dashboard-spatial-figure">
                                     <div class="dashboard-spatial-canvas-frame">
                                         <canvas class="dashboard-spatial-map-canvas" width="1100" height="600" role="img" aria-label="Loading spatial temperature map"></canvas>
@@ -2983,9 +2988,9 @@
                                         <button class="dashboard-spatial-control is-active" type="button" data-spatial-product="dcentI" aria-pressed="true">DCENT-I</button>
                                         <button class="dashboard-spatial-control" type="button" data-spatial-product="dcent" aria-pressed="false">DCENT</button>
                                     </div>
-                                    <div class="dashboard-spatial-control-group" role="group" aria-label="Choose the map measure">
-                                        <button class="dashboard-spatial-control is-active" type="button" data-spatial-metric="signal" aria-pressed="true">Warming signal</button>
-                                        <button class="dashboard-spatial-control" type="button" data-spatial-metric="rank" aria-pressed="false">Temperature rank</button>
+                                    <div class="dashboard-spatial-control-group" role="group" aria-label="Choose the map time scale">
+                                        <button class="dashboard-spatial-control is-active" type="button" data-spatial-time="annual" aria-pressed="true">Annual</button>
+                                        <button class="dashboard-spatial-control" type="button" data-spatial-time="monthly" aria-pressed="false">Monthly</button>
                                     </div>
                                 </div>
                             </div>
