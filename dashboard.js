@@ -15,6 +15,18 @@
         }
     };
     const BERKELEY_LIVE_DATA_URL = 'https://storage.googleapis.com/storage/v1/b/berkeley-earth-temperature-hr/o/global%2FGlobal_TAVG_annual.txt?alt=media';
+    const REGIONAL_SERIES = {
+        NHST: { label: 'Northern Hemisphere', scope: 'Northern Hemisphere', color: '#B75B4F', south: 0, north: 90 },
+        SHST: { label: 'Southern Hemisphere', scope: 'Southern Hemisphere', color: '#8263A6', south: -90, north: 0 },
+        LST: { label: 'Land', scope: 'Land (continents and islands)', color: '#987027' },
+        OST: { label: 'Ocean', scope: 'Ocean (60°S–60°N)', color: '#3276AE', south: -60, north: 60 },
+        Arc: { label: 'Arctic', scope: 'Arctic (60°N–90°N)', color: '#2F8085', south: 60, north: 90 }
+    };
+    // Third card y-axis limits in °C: [minimum, maximum]. Arctic is controlled separately.
+    const REGIONAL_Y_LIMITS = {
+        annual: { other: [-0.6, 2.6], arctic: [-1.5, 3.5] },
+        monthly: { other: [-1.3, 3.5], arctic: [-3, 6] }
+    };
     const NOAA_LIVE_DATA_URL = 'https://www.ncei.noaa.gov/data/noaa-global-surface-temperature/v6.1/access/timeseries/aravg.ann.land_ocean.90S.90N.v6.1.0.202606.asc';
     const HADCRUT_LOCAL_DATA_URL = 'data/HadCRUT.5.1.0.0.analysis.summary_series.global.annual.csv';
     const GISS_LOCAL_DATA_URL = 'data/GLB.Ts%2BdSST.txt';
@@ -154,6 +166,7 @@
         }
     };
     const WORLD_BOUNDARIES_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
+    let worldBoundaryPathsRequest;
     const SERIES_STYLES = {
         dcentI: {
             key: 'dcentI',
@@ -568,6 +581,123 @@
         });
     }
 
+    function regionalAnomalies(annualDatasets, monthlyDatasets) {
+        const monthly = monthlyDatasets.map(dataset => {
+            const baselines = MONTH_LABELS.map((_, monthIndex) => annualMeanForPeriod(
+                dataset.records.map(record => ({ year: record.year, value: record.months[monthIndex] })),
+                BASELINE_START_YEAR, BASELINE_END_YEAR, `${dataset.label} monthly data`
+            ));
+            return {
+                ...SERIES_STYLES[dataset.key],
+                records: dataset.records.flatMap(record => record.months.flatMap((value, monthIndex) => (
+                    Number.isFinite(value) ? [{
+                        year: record.year + (monthIndex + 0.5) / 12,
+                        monthIndex,
+                        value: value - baselines[monthIndex],
+                        dateLabel: `${MONTH_LABELS[monthIndex]} ${record.year}`
+                    }] : []
+                )))
+            };
+        });
+        const annual = annualDatasets.map(dataset => {
+            const monthlyRecords = monthly.find(item => item.key === dataset.key).records;
+            return {
+                ...dataset,
+                records: rebaseAnomalies(dataset.records, BASELINE_START_YEAR, BASELINE_END_YEAR).map(record => {
+                    const months = monthlyRecords.filter(month => Math.floor(month.year) === record.year);
+                    if (!months.length || months.length === 12) return record;
+                    // Match a provisional year's baseline to the months actually available.
+                    return {
+                        ...record,
+                        value: months.reduce((sum, month) => sum + month.value, 0) / months.length,
+                        provisional: true,
+                        dateLabel: `${record.year} (${MONTH_LABELS[months[0].monthIndex]}–${MONTH_LABELS[months.at(-1).monthIndex]})`
+                    };
+                })
+            };
+        });
+        return { annual, monthly };
+    }
+
+    function initialiseRegionalChart(host, initialState = {}, onStateChange) {
+        const state = {
+            region: Object.hasOwn(REGIONAL_SERIES, initialState.region) ? initialState.region : 'NHST',
+            product: initialState.product === 'dcent' ? 'dcent' : 'dcentI',
+            timeMode: initialState.timeMode === 'monthly' ? 'monthly' : 'annual'
+        };
+        const chartHost = host.querySelector('.dashboard-regional-chart');
+        const note = host.querySelector('[data-regional-note]');
+        const controls = [...host.querySelectorAll('[data-regional-option]')];
+        const requests = new Map();
+        let accessRequest;
+        let requestId = 0;
+
+        function loadRegion(region) {
+            if (!requests.has(region)) {
+                // Access is the source of truth for the regional live-data links.
+                accessRequest ||= fetchLiveText('sections/access_live.html')
+                    .then(text => new DOMParser().parseFromString(text, 'text/html'))
+                    .catch(error => { accessRequest = undefined; throw error; });
+                const request = accessRequest.then(access => Promise.all(['annual', 'monthly'].map(timeMode => {
+                    const link = access.querySelector(`a[href*="/DCENT_DCENT_I_${region}_${timeMode}_statistics_live.txt"]`);
+                    if (!link) throw new Error(`The ${region} ${timeMode} data link is unavailable.`);
+                    const url = new URL(link.href);
+                    url.hostname = 'dl.dropboxusercontent.com';
+                    return fetchLiveText(url.href);
+                })))
+                    .then(([annualText, monthlyText]) => regionalAnomalies(
+                        parseDcentSeries(annualText), parseMonthlyDcentSeries(monthlyText)
+                    ))
+                    .catch(error => { requests.delete(region); throw error; });
+                requests.set(region, request);
+            }
+            return requests.get(region);
+        }
+
+        async function refresh() {
+            const id = ++requestId;
+            const { scope, color } = REGIONAL_SERIES[state.region];
+            host.style.setProperty('--regional-color', color);
+            controls.forEach(button => {
+                const active = state[button.dataset.regionalOption] === button.dataset.value;
+                button.classList.toggle('is-active', active);
+                button.setAttribute('aria-pressed', String(active));
+            });
+            chartHost.setAttribute('aria-busy', 'true');
+            if (!chartHost.querySelector('svg')) {
+                chartHost.innerHTML = '<p class="dashboard-status">Loading regional temperature data…</p>';
+            }
+            try {
+                const [datasets, boundaryPaths] = await Promise.all([
+                    loadRegion(state.region),
+                    loadWorldBoundaryPaths().catch(error => {
+                        console.warn('Unable to load the regional inset:', error);
+                    })
+                ]);
+                if (id !== requestId) return;
+                // Both captions occupy the same grid cell, keeping the layout stable when toggled.
+                note.innerHTML = `
+                    <span aria-hidden="${state.timeMode !== 'annual'}">${scope}. Anomalies relative to each product’s own 1850–1900 mean; incomplete years use matching baseline months. Shading: 95% c.i.</span>
+                    <span aria-hidden="${state.timeMode !== 'monthly'}">${scope}. Anomalies relative to each product’s own 1850–1900 calendar-month means.</span>`;
+                renderChart(chartHost, datasets[state.timeMode], undefined, { ...state, scope, boundaryPaths });
+            } catch (error) {
+                if (id !== requestId) return;
+                chartHost.innerHTML = '<p class="dashboard-status error">Regional data could not be loaded. Select a region to try again.</p>';
+                console.error('Unable to load regional temperature data:', error);
+            } finally {
+                if (id === requestId) chartHost.removeAttribute('aria-busy');
+            }
+        }
+
+        controls.forEach(button => button.addEventListener('click', () => {
+            state[button.dataset.regionalOption] = button.dataset.value;
+            onStateChange({ ...state });
+            refresh();
+        }));
+        // Prepare the selected chart and cache every region while the first card is visible.
+        return Promise.allSettled([refresh(), ...Object.keys(REGIONAL_SERIES).map(loadRegion)]);
+    }
+
     function readDashboardSessionState() {
         try {
             const value = sessionStorage.getItem(DASHBOARD_SESSION_STATE_KEY);
@@ -593,12 +723,12 @@
     }
 
     function tickLabel(value, step) {
-        const decimals = step < 1 ? Math.max(1, Math.ceil(-Math.log10(step))) : 0;
+        const decimals = step.toString().split('.')[1]?.length || 0;
         return value.toFixed(decimals).replace(/\.0+$/, '');
     }
 
-    function linePath(records, x, y) {
-        return records.map((record, index) => `${index === 0 ? 'M' : 'L'} ${x(record.year).toFixed(2)} ${y(record.value).toFixed(2)}`).join(' ');
+    function linePath(records, x, y, maximumGap = Infinity) {
+        return records.map((record, index) => `${index === 0 || record.year - records[index - 1].year > maximumGap ? 'M' : 'L'} ${x(record.year).toFixed(2)} ${y(record.value).toFixed(2)}`).join(' ');
     }
 
     function areaPath(records, x, y) {
@@ -655,20 +785,45 @@
         return `${month} ${ranking.year} ranked as the <span class="dashboard-panel-rank">${ordinal(ranking.rank)}</span> warmest ${month} in ${ranking.label}${punctuation}`;
     }
 
-    function renderChart(host, series, onSeriesFocus) {
+    function animateRegionalYLimits(host, target, draw) {
+        cancelAnimationFrame(host.regionalAxisFrame);
+        const from = host.regionalYLimits || target;
+        const animate = from.some((value, index) => value !== target[index])
+            && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const start = performance.now();
+        function frame(now) {
+            const progress = animate ? Math.min(1, (now - start) / 450) : 1;
+            const eased = 1 - (1 - progress) ** 3;
+            const limits = progress === 1 ? target : from.map((value, index) => value + (target[index] - value) * eased);
+            // Keep the displayed range so a quick second click continues from the current frame.
+            host.regionalYLimits = limits;
+            draw(limits, progress < 1);
+            if (progress < 1) host.regionalAxisFrame = requestAnimationFrame(frame);
+        }
+        frame(start);
+    }
+
+    function renderChart(host, series, onSeriesFocus, regionalView) {
+        const isMonthly = regionalView?.timeMode === 'monthly';
+        const pointRadius = isMonthly ? 0 : POINT_RADIUS;
+        const regionalColor = REGIONAL_SERIES[regionalView?.region]?.color;
+        const plottedSeries = regionalView ? series.filter(item => item.key === regionalView.product).map(item => ({
+            ...item, activeColor: regionalColor, pointColor: regionalColor, areaOpacity: 0.18
+        })) : series;
         const width = 1100;
         const margin = { top: 20, right: 40, bottom: 86, left: 88 };
         const height = margin.top + ANNUAL_CHART_PLOT_HEIGHT + margin.bottom;
         const chartWidth = width - margin.left - margin.right;
         const chartHeight = ANNUAL_CHART_PLOT_HEIGHT;
-        const firstYear = Math.min(...series.flatMap(item => item.records.map(record => record.year)));
-        const lastYear = Math.max(...series.flatMap(item => item.records.map(record => record.year)));
-        const xDomainStart = firstYear - 0.5;
-        const xDomainEnd = lastYear + 0.5;
-        const yMin = -0.6;
-        const yMax = 1.7;
-        const majorGridStep = 0.5;
-        const minorGridStep = 0.1;
+        const firstYear = Math.floor(Math.min(...series.flatMap(item => item.records.map(record => record.year))));
+        const lastYear = Math.floor(Math.max(...series.flatMap(item => item.records.map(record => record.year))));
+        const xDomainStart = firstYear - (isMonthly ? 0 : 0.5);
+        const xDomainEnd = lastYear + (isMonthly ? 1 : 0.5);
+        const majorGridStep = regionalView && isMonthly ? (regionalView.region === 'Arc' ? 2 : 1) : 0.5;
+        const minorGridStep = regionalView && isMonthly ? 0.5 : 0.1;
+        const [yMin, yMax] = regionalView
+            ? REGIONAL_Y_LIMITS[regionalView.timeMode][regionalView.region === 'Arc' ? 'arctic' : 'other']
+            : [-0.6, 1.7];
         const x = year => margin.left + ((year - xDomainStart) / (xDomainEnd - xDomainStart)) * chartWidth;
         const y = value => margin.top + ((yMax - value) / (yMax - yMin)) * chartHeight;
 
@@ -678,19 +833,27 @@
             height,
             viewBox: `0 0 ${width} ${height}`,
             role: 'img',
-            'aria-label': `Annual global mean surface temperature anomalies, ${firstYear} to ${lastYear}`
+            'aria-label': regionalView
+                ? `${plottedSeries[0].label} ${regionalView.timeMode} ${regionalView.scope} temperature anomalies, ${firstYear} to ${lastYear}, relative to its own 1850–1900 mean`
+                : `Annual global mean surface temperature anomalies, ${firstYear} to ${lastYear}`
         });
 
         const defs = appendSvg(svg, 'defs');
-        const clipPath = appendSvg(defs, 'clipPath', { id: 'annual-gmst-clip' });
+        const clipId = regionalView ? 'regional-temperature-clip' : 'annual-gmst-clip';
+        const clipPath = appendSvg(defs, 'clipPath', { id: clipId });
         appendSvg(clipPath, 'rect', { x: margin.left, y: margin.top, width: chartWidth, height: chartHeight });
 
         const grid = appendSvg(svg, 'g');
-        for (let gridValue = Math.ceil(yMin / minorGridStep) * minorGridStep; gridValue <= yMax + minorGridStep / 100; gridValue += minorGridStep) {
-            const value = Math.round(gridValue * 10) / 10;
+        const gridLines = regionalView ? appendSvg(grid, 'g', { 'clip-path': `url(#${clipId})` }) : grid;
+        const gridEntries = [];
+        const previousLimits = regionalView ? host.regionalYLimits : undefined;
+        const gridMin = Math.min(yMin, previousLimits?.[0] ?? yMin);
+        const gridMax = Math.max(yMax, previousLimits?.[1] ?? yMax);
+        for (let gridValue = Math.ceil(gridMin / minorGridStep) * minorGridStep; gridValue <= gridMax + minorGridStep / 100; gridValue += minorGridStep) {
+            const value = Number(gridValue.toFixed(6));
             const yPosition = y(value);
             const isMajor = Math.abs(value / majorGridStep - Math.round(value / majorGridStep)) < 0.000001;
-            appendSvg(grid, 'line', {
+            const line = appendSvg(gridLines, 'line', {
                 class: Math.abs(value) < 0.000001
                     ? 'dashboard-zero-line'
                     : isMajor ? 'dashboard-grid-line-major' : 'dashboard-grid-line-minor',
@@ -699,39 +862,43 @@
                 y1: yPosition,
                 y2: yPosition
             });
-            if (isMajor) {
-                appendSvg(grid, 'text', {
+            const label = isMajor
+                ? appendSvg(grid, 'text', {
                     class: 'dashboard-tick',
                     x: margin.left - 12,
                     y: yPosition + 7,
                     'text-anchor': 'end'
-                }, tickLabel(value, majorGridStep));
-            }
+                }, tickLabel(value, majorGridStep))
+                : undefined;
+            gridEntries.push({ value, line, label });
         }
 
-        const dataLayer = appendSvg(svg, 'g', { 'clip-path': 'url(#annual-gmst-clip)' });
-        const areaLayer = appendSvg(dataLayer, 'g');
-        const lineLayer = appendSvg(dataLayer, 'g');
+        const dataLayer = appendSvg(svg, 'g', { 'clip-path': `url(#${clipId})` });
+        const scaledLayer = regionalView ? appendSvg(dataLayer, 'g') : dataLayer;
+        const areaLayer = appendSvg(scaledLayer, 'g');
+        const lineLayer = appendSvg(scaledLayer, 'g');
         const pointLayer = appendSvg(dataLayer, 'g');
         const markerLayer = appendSvg(svg, 'g');
         const seriesState = new Map();
-        series.forEach(item => {
+        plottedSeries.forEach(item => {
             const area = item.records.some(record => (
                 Number.isFinite(record.uncertainty)
                 || (Number.isFinite(record.lower) && Number.isFinite(record.upper))
             ))
                 ? appendSvg(areaLayer, 'path', { class: `dashboard-series-area ${item.className}`, d: areaPath(item.records, x, y) })
                 : undefined;
-            const line = appendSvg(lineLayer, 'path', { class: `dashboard-series-line ${item.className}`, d: linePath(item.records, x, y) });
+            const line = appendSvg(lineLayer, 'path', { class: `dashboard-series-line ${item.className}`, d: linePath(item.records, x, y, isMonthly ? 1.1 / 12 : Infinity) });
             const points = appendSvg(pointLayer, 'g', { class: `dashboard-series-points ${item.className}` });
             const entries = item.records.map(record => {
                 const point = appendSvg(points, 'circle', {
                     class: 'dashboard-series-point',
                     cx: x(record.year),
                     cy: y(record.value),
-                    r: POINT_RADIUS
+                    r: pointRadius
                 });
-                const rank = 1 + item.records.filter(candidate => candidate.value > record.value).length;
+                const rank = 1 + item.records.filter(candidate => (
+                    (!isMonthly || candidate.monthIndex === record.monthIndex) && candidate.value > record.value
+                )).length;
                 return { point, record, rank, color: item.pointColor };
             });
             seriesState.set(item.key, { ...item, area, line, points, entries });
@@ -774,7 +941,7 @@
             height: chartHeight
         });
         const parisLimit = 1.5;
-        if (parisLimit >= yMin && parisLimit <= yMax) {
+        if (!regionalView && parisLimit >= yMin && parisLimit <= yMax) {
             const parisY = y(parisLimit);
             appendSvg(svg, 'line', {
                 class: 'dashboard-paris-limit-line',
@@ -801,6 +968,7 @@
         const legendWidth = series.reduce((sum, item) => sum + legendEntryWidths[item.key], 0);
         const legend = appendSvg(svg, 'g', {
             class: 'dashboard-svg-legend',
+            visibility: regionalView ? 'hidden' : 'visible',
             transform: `translate(${width - margin.right - legendWidth - 10} ${height - margin.bottom - 45})`
         });
         appendSvg(legend, 'rect', {
@@ -812,7 +980,7 @@
             rx: 4
         });
         let legendOffset = 0;
-        series.forEach((item, index) => {
+        (regionalView ? [] : series).forEach((item, index) => {
             const entry = appendSvg(legend, 'g', {
                 class: `dashboard-svg-legend-entry ${item.className}`,
                 transform: `translate(${legendOffset} 0)`,
@@ -874,9 +1042,9 @@
             y: margin.top + chartHeight / 2,
             transform: `rotate(-90 23 ${margin.top + chartHeight / 2})`,
             'text-anchor': 'middle'
-        }, 'GMST anomalies (°C)');
+        }, regionalView ? 'Temperature anomalies (°C)' : 'GMST anomalies (°C)');
 
-        const tooltipWidth = 84;
+        const tooltipWidth = regionalView ? 155 : 84;
         const tooltipHeight = 78;
         const tooltip = appendSvg(svg, 'g', { class: 'dashboard-tooltip', visibility: 'hidden' });
         appendSvg(tooltip, 'rect', { class: 'dashboard-tooltip-background', width: tooltipWidth, height: tooltipHeight, rx: 5 });
@@ -892,12 +1060,12 @@
 
         function hideTooltip() {
             tooltip.setAttribute('visibility', 'hidden');
-            if (hoveredEntry) hoveredEntry.point.setAttribute('r', POINT_RADIUS);
+            if (hoveredEntry) hoveredEntry.point.setAttribute('r', pointRadius);
             hoveredEntry = undefined;
         }
 
         function showTooltip(entry) {
-            if (hoveredEntry && hoveredEntry !== entry) hoveredEntry.point.setAttribute('r', POINT_RADIUS);
+            if (hoveredEntry && hoveredEntry !== entry) hoveredEntry.point.setAttribute('r', pointRadius);
             hoveredEntry = entry;
             hoveredEntry.point.setAttribute('r', HOVER_POINT_RADIUS);
 
@@ -907,9 +1075,9 @@
             if (tooltipY < margin.top) tooltipY = y(entry.record.value) + 12;
 
             tooltip.setAttribute('transform', `translate(${tooltipX} ${tooltipY})`);
-            tooltipYear.textContent = String(entry.record.year);
+            tooltipYear.textContent = entry.record.dateLabel || String(entry.record.year);
             tooltipValue.textContent = formatAnomaly(entry.record.value);
-            tooltipRank.textContent = ordinal(entry.rank);
+            tooltipRank.textContent = entry.record.provisional ? 'Provisional' : `${ordinal(entry.rank)}${isMonthly ? ` ${MONTH_LABELS[entry.record.monthIndex]}` : ''}`;
             tooltipValue.setAttribute('fill', entry.color);
             tooltip.setAttribute('visibility', 'visible');
         }
@@ -947,11 +1115,12 @@
                     state.area.style.opacity = isActive ? '1' : '0';
                 }
                 state.line.style.stroke = isActive ? state.activeColor : state.inactiveColor;
-                state.line.style.strokeWidth = isActive ? '1.8' : '1.2';
+                state.line.style.strokeWidth = isMonthly ? '0.9' : isActive ? '1.8' : '1.2';
                 state.entries.forEach(entry => {
                     entry.point.style.fill = state.pointColor;
                     entry.point.style.opacity = isActive ? '1' : '0';
                 });
+                if (!state.legend) return;
                 state.legend.band.style.fill = state.activeColor;
                 state.legend.band.style.fillOpacity = String(state.areaOpacity);
                 state.legend.band.style.opacity = isActive && state.area ? '1' : '0';
@@ -970,16 +1139,42 @@
             latestMarker.setAttribute('transform', `translate(${x(latest.year)} ${y(latest.value)})`);
             rippleRings.forEach(ring => { ring.style.stroke = activeState.activeColor; });
             latestMarkerDot.style.fill = activeState.pointColor;
-            onSeriesFocus(activeState);
+            onSeriesFocus?.(activeState);
         }
 
         seriesState.forEach(state => {
+            if (!state.legend) return;
             state.legend.entry.addEventListener('pointerenter', () => focusSeries(state.key));
             state.legend.entry.addEventListener('focus', () => focusSeries(state.key));
         });
 
-        focusSeries('dcentI');
+        focusSeries(regionalView ? regionalView.product : 'dcentI');
+        if (regionalView?.boundaryPaths?.land) {
+            renderRegionalInset(svg, regionalView.region, regionalView.boundaryPaths, margin.left + 14, margin.top + 8);
+            svg.appendChild(tooltip);
+        }
         host.appendChild(svg);
+        if (regionalView) {
+            const activeState = seriesState.get(regionalView.product);
+            const latest = activeState.records.at(-1);
+            animateRegionalYLimits(host, [yMin, yMax], ([minimum, maximum], moving) => {
+                const currentY = value => margin.top + (maximum - value) / (maximum - minimum) * chartHeight;
+                const scale = (yMax - yMin) / (maximum - minimum);
+                scaledLayer.setAttribute('transform', `translate(0 ${currentY(yMax) - scale * margin.top}) scale(1 ${scale})`);
+                gridEntries.forEach(({ value, line, label }) => {
+                    const position = currentY(value);
+                    line.setAttribute('y1', position);
+                    line.setAttribute('y2', position);
+                    if (label) {
+                        label.setAttribute('y', position + 7);
+                        label.setAttribute('visibility', value < minimum - 1e-6 || value > maximum + 1e-6 ? 'hidden' : 'visible');
+                    }
+                });
+                if (!isMonthly) activeState.entries.forEach(entry => entry.point.setAttribute('cy', currentY(entry.record.value)));
+                latestMarker.setAttribute('transform', `translate(${x(latest.year)} ${currentY(latest.value)})`);
+                hitArea.style.pointerEvents = moving ? 'none' : '';
+            });
+        }
     }
 
     function blendColor(from, to, amount) {
@@ -1722,6 +1917,78 @@
         return normalised < 0 ? normalised + 360 : normalised;
     }
 
+    function loadWorldBoundaryPaths() {
+        worldBoundaryPathsRequest ||= fetchLiveText(WORLD_BOUNDARIES_URL)
+            .then(parseWorldBoundaryPaths)
+            .catch(error => { worldBoundaryPathsRequest = undefined; throw error; });
+        return worldBoundaryPathsRequest;
+    }
+
+    function renderRegionalInset(svg, regionKey, boundaryPaths, x, y) {
+        const region = REGIONAL_SERIES[regionKey];
+        const canvas = document.createElement('canvas');
+        canvas.width = 600;
+        canvas.height = 360;
+        const context = canvas.getContext('2d');
+        const project = createRobinsonProjection(canvas.width, canvas.height);
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.save();
+        clipToRobinsonOutline(context, project);
+        context.fillStyle = '#f1f5f7';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        const traceLand = () => {
+            context.beginPath();
+            boundaryPaths.land.forEach(ring => {
+                for (const offset of [-360, 0, 360]) {
+                    ring.forEach(([longitude, latitude], index) => {
+                        const point = project(longitude + offset, latitude);
+                        if (index === 0) context.moveTo(point.x, point.y);
+                        else context.lineTo(point.x, point.y);
+                    });
+                    context.closePath();
+                }
+            });
+        };
+        traceLand();
+        context.fillStyle = '#dbe2e5';
+        context.fill('evenodd');
+        context.fillStyle = region.color;
+        context.globalAlpha = 0.32;
+        if (regionKey === 'LST') {
+            context.fill('evenodd');
+        } else {
+            const top = project(0, region.north).y;
+            const bottom = project(0, region.south).y;
+            context.fillRect(0, top, canvas.width, bottom - top);
+        }
+        context.globalAlpha = 1;
+        if (regionKey === 'OST') {
+            context.fillStyle = '#dbe2e5';
+            context.fill('evenodd');
+        }
+        context.strokeStyle = '#82949c';
+        context.lineWidth = 1.6;
+        boundaryPaths.coastlines.forEach(path => drawHorizontalBoundaryPath(context, path, project, 0));
+        context.restore();
+        traceRobinsonOutline(context, project);
+        context.strokeStyle = '#82949c';
+        context.lineWidth = 1.6;
+        context.stroke();
+
+        const inset = appendSvg(svg, 'g', {
+            class: 'dashboard-regional-inset', role: 'img',
+            'aria-label': `Averaging region: ${region.scope}. Geographic extent, not changing observation coverage.`,
+            'pointer-events': 'none'
+        });
+        appendSvg(inset, 'image', { x, y, width: 240, height: 144, href: canvas.toDataURL('image/png') });
+        appendSvg(inset, 'text', {
+            x: x + 120, y: y + 150, 'text-anchor': 'middle',
+            fill: '#667594', 'font-family': 'Calibri, Arial, sans-serif', 'font-size': 17
+        }, 'Averaging region');
+    }
+
     function parseWorldBoundaryPaths(text) {
         const topology = JSON.parse(text);
         const countries = topology.objects && topology.objects.countries;
@@ -1763,10 +2030,28 @@
             });
         };
 
-        return [...arcUses].reduce((paths, [index, uses]) => {
+        const paths = [...arcUses].reduce((paths, [index, uses]) => {
             paths[uses === 1 ? 'coastlines' : 'borders'].push(decodeArc(index));
             return paths;
         }, { coastlines: [], borders: [] });
+        paths.land = topology.objects.land.geometries.flatMap(geometry => geometry.arcs.flatMap(polygon => polygon.map(arcs => {
+            const ring = arcs.flatMap((index, position) => {
+                const coordinates = decodeArc(index < 0 ? ~index : index);
+                if (index < 0) coordinates.reverse();
+                return position ? coordinates.slice(1) : coordinates;
+            });
+            let previousLongitude = ring[0][0];
+            const unwrapped = ring.map(([longitude, latitude]) => {
+                previousLongitude = unwrapLongitude(longitude, previousLongitude);
+                return [previousLongitude, latitude];
+            });
+            // The Antarctic ring surrounds the pole; close its fill along 90°S.
+            if (Math.abs(unwrapped.at(-1)[0] - unwrapped[0][0]) > 180) {
+                unwrapped.push([unwrapped.at(-1)[0], -90], [unwrapped[0][0], -90]);
+            }
+            return unwrapped;
+        })));
+        return paths;
     }
 
     function unwrapLongitude(longitude, referenceLongitude) {
@@ -2320,8 +2605,7 @@
 
         function loadBoundaryPaths() {
             if (!boundaryPathsPromise) {
-                boundaryPathsPromise = fetchLiveText(WORLD_BOUNDARIES_URL)
-                    .then(parseWorldBoundaryPaths)
+                boundaryPathsPromise = loadWorldBoundaryPaths()
                     .catch(error => {
                         console.warn('Unable to load world boundaries for the spatial map:', error);
                         return { coastlines: [], borders: [] };
@@ -2648,6 +2932,31 @@
                             </figure>
                         </section>
                     </article>
+                    <article class="dashboard-slide" aria-label="Regional temperature time series">
+                        <section class="dashboard-panel dashboard-panel--regional">
+                            <div class="dashboard-regional-regions" role="group" aria-label="Choose a region">
+                                ${Object.entries(REGIONAL_SERIES).map(([key, region]) => `
+                                    <button class="dashboard-spatial-control${key === 'NHST' ? ' is-active' : ''}" type="button" data-regional-option="region" data-value="${key}" aria-pressed="${key === 'NHST'}">${region.label}</button>
+                                `).join('')}
+                            </div>
+                            <figure class="dashboard-figure">
+                                <div class="dashboard-chart-frame">
+                                    <div class="dashboard-chart dashboard-regional-chart"><p class="dashboard-status">Loading regional temperature data…</p></div>
+                                </div>
+                                <div class="dashboard-regional-controls">
+                                    <div class="dashboard-spatial-control-group" role="group" aria-label="Choose the regional temperature product">
+                                        <button class="dashboard-spatial-control is-active" type="button" data-regional-option="product" data-value="dcentI" aria-pressed="true">DCENT-I</button>
+                                        <button class="dashboard-spatial-control" type="button" data-regional-option="product" data-value="dcent" aria-pressed="false">DCENT</button>
+                                    </div>
+                                    <div class="dashboard-spatial-control-group" role="group" aria-label="Choose the regional time scale">
+                                        <button class="dashboard-spatial-control is-active" type="button" data-regional-option="timeMode" data-value="annual" aria-pressed="true">Annual</button>
+                                        <button class="dashboard-spatial-control" type="button" data-regional-option="timeMode" data-value="monthly" aria-pressed="false">Monthly</button>
+                                    </div>
+                                </div>
+                                <figcaption class="dashboard-chart-note" data-regional-note></figcaption>
+                            </figure>
+                        </section>
+                    </article>
                     <article class="dashboard-slide" aria-label="Spatial temperature maps">
                         <section class="dashboard-panel dashboard-panel--map" aria-label="Spatial temperature maps">
                             <div class="dashboard-spatial-map">
@@ -2704,8 +3013,9 @@
                         <div class="dashboard-carousel-dots" aria-label="Choose dashboard view">
                             <button class="dashboard-carousel-dot" type="button" data-carousel-slide="0" aria-label="Show annual global mean surface temperature"></button>
                             <button class="dashboard-carousel-dot" type="button" data-carousel-slide="1" aria-label="Show monthly time series"></button>
-                            <button class="dashboard-carousel-dot" type="button" data-carousel-slide="2" aria-label="Show spatial maps"></button>
-                            <button class="dashboard-carousel-dot" type="button" data-carousel-slide="3" aria-label="Show DCENT-I warming stripes"></button>
+                            <button class="dashboard-carousel-dot" type="button" data-carousel-slide="2" aria-label="Show regional time series"></button>
+                            <button class="dashboard-carousel-dot" type="button" data-carousel-slide="3" aria-label="Show spatial maps"></button>
+                            <button class="dashboard-carousel-dot" type="button" data-carousel-slide="4" aria-label="Show DCENT-I warming stripes"></button>
                         </div>
                     </div>
                     <button class="dashboard-carousel-arrow" type="button" data-carousel-next aria-label="Next dashboard view">›</button>
@@ -2717,6 +3027,11 @@
         const annualSubtitle = content.querySelector('.dashboard-panel-subtitle');
         const monthlySubtitle = content.querySelector('[data-monthly-subtitle]');
         const stripeChartHost = content.querySelector('.dashboard-stripe-chart');
+        initialiseRegionalChart(
+            content.querySelector('.dashboard-panel--regional'),
+            dashboardState.regionalChart,
+            regionalState => saveDashboardState({ regionalChart: regionalState })
+        );
         const spatialMap = initialiseSpatialMap(
             content.querySelector('.dashboard-spatial-map'),
             dashboardState.spatialMap,
@@ -2792,7 +3107,7 @@
         });
         initialiseCarousel(content.querySelector('.dashboard-carousel'), activeIndex => {
             saveDashboardState({ activeSlide: activeIndex });
-            if (activeIndex === 2) {
+            if (activeIndex === 3) {
                 spatialMap.ensureLoaded();
                 spatialMap.preloadLatestMonth();
             }
