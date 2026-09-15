@@ -3343,8 +3343,8 @@
                         <section class="dashboard-panel dashboard-panel--map" aria-label="Spatial temperature maps">
                             <div class="dashboard-spatial-map">
                                 <div class="dashboard-spatial-top-controls" role="group" aria-label="Choose the map measure">
-                                    <button class="dashboard-spatial-control is-active" type="button" data-spatial-metric="signal" aria-pressed="true">Warming signal</button>
-                                    <button class="dashboard-spatial-control" type="button" data-spatial-metric="rank" aria-pressed="false">Temperature rank</button>
+                                    <button class="dashboard-spatial-control is-active" type="button" data-spatial-metric="signal" aria-pressed="true">Temperature</button>
+                                    <button class="dashboard-spatial-control" type="button" data-spatial-metric="rank" aria-pressed="false">Ranking</button>
                                 </div>
                                 <div class="dashboard-spatial-month-navigation" role="group" data-spatial-month-navigation aria-label="Browse recent monthly maps">
                                     <button class="dashboard-spatial-step" type="button" data-spatial-previous-month aria-label="Previous month">‹</button>
