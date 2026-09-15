@@ -15,6 +15,13 @@
         }
     };
     const BERKELEY_LIVE_DATA_URL = 'https://storage.googleapis.com/storage/v1/b/berkeley-earth-temperature-hr/o/global%2FGlobal_TAVG_annual.txt?alt=media';
+    const NINO34_DATA_URL = 'https://dl.dropboxusercontent.com/scl/fi/i9tuswl0rs0g8ylzri2bs/DCENT_DCENT_I_Nino34_monthly_statistics_live.txt?rlkey=soatrfhnxmumjlfx2ymvny2d7&dl=0';
+    // Niño 卡片手动调整区；保存后刷新页面即可生效。
+    const NINO34_SETTINGS = {
+        threshold: 1.0, // 正数，单位 °C；事件识别、阈值线和注释共用此值，持续时间仍为 5 个重叠季节。
+        barColors: { warm: '#b71f29', cold: '#1b6396' }, // 月度柱子及历史对比线的暖 / 冷色。
+        bandColors: { warm: '#f2d5d8', cold: '#cfe3f3' } // 事件背景色带的实际颜色，建议用浅色。
+    };
     const REGIONAL_SERIES = {
         NHST: { label: 'Northern Hemisphere', scope: 'Northern Hemisphere', color: '#B75B4F', south: 0, north: 90 },
         SHST: { label: 'Southern Hemisphere', scope: 'Southern Hemisphere', color: '#8263A6', south: -90, north: 0 },
@@ -700,6 +707,381 @@
         }));
         // Prepare the selected chart and cache every region while the first card is visible.
         return Promise.allSettled([refresh(), ...Object.keys(REGIONAL_SERIES).map(loadRegion)]);
+    }
+
+    function parseNino34Series(text) {
+        const lines = text.replace(/\r/g, '').split('\n');
+        const header = lines.findIndex(line => /^Year\s*,\s*Month\s*,/.test(line.trim()));
+        if (header < 0) throw new Error('The Niño 3.4 file must contain Year and Month columns.');
+        const records = lines.slice(header + 1).filter(line => line.trim()).map(line => {
+            const columns = line.split(',').map(value => Number.parseFloat(value.trim()));
+            const [year, month, value] = columns;
+            if (columns.length !== 6 || !Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+                throw new Error('Invalid date in the Niño 3.4 monthly file.');
+            }
+            // Only DCENT-I is plotted; missing DCENT values must not discard this month.
+            return { year: year + (month - 0.5) / 12, monthIndex: month - 1,
+                monthId: year * 12 + month - 1, value, dcentAvailable: Number.isFinite(columns[4]),
+                dateLabel: `${MONTH_LABELS[month - 1]} ${year}` };
+        });
+        if (!records.length || records.some((record, index) => index && record.monthId <= records[index - 1].monthId)) {
+            throw new Error('Niño 3.4 months must be unique and in chronological order.');
+        }
+        return records;
+    }
+
+    function adjustNino34Baseline(records) {
+        const first = records[0];
+        const latest = records.at(-1);
+        const firstCompleteYear = Math.floor(first.year) + (first.monthIndex === 0 ? 0 : 1);
+        const lastCompleteYear = Math.floor(latest.year) - (latest.monthIndex === 11 ? 0 : 1);
+        // Hold the newest baseline fixed between five-year updates (2026–2030 uses 1996–2025).
+        const latestBaselineEnd = Math.floor(lastCompleteYear / 5) * 5;
+        if (latestBaselineEnd - firstCompleteYear < 29) throw new Error('Niño 3.4 needs a complete 30-year monthly baseline.');
+        const baselines = new Map();
+        const adjusted = records.map(record => {
+            const blockStart = Math.floor((Math.floor(record.year) - 1) / 5) * 5 + 1;
+            const baselineStart = Math.max(firstCompleteYear, Math.min(blockStart - 15, latestBaselineEnd - 29));
+            if (!baselines.has(baselineStart)) {
+                const months = Array.from({ length: 12 }, () => []);
+                records.forEach(candidate => {
+                    const year = Math.floor(candidate.year);
+                    if (year >= baselineStart && year < baselineStart + 30 && Number.isFinite(candidate.value)) {
+                        months[candidate.monthIndex].push(candidate.value);
+                    }
+                });
+                if (months.some(values => values.length !== 30)) {
+                    throw new Error(`Incomplete Niño 3.4 baseline: ${baselineStart}–${baselineStart + 29}.`);
+                }
+                baselines.set(baselineStart, months.map(values => values.reduce((sum, value) => sum + value, 0) / 30));
+            }
+            return { ...record, value: record.value - baselines.get(baselineStart)[record.monthIndex],
+                baselineStart, baselineEnd: baselineStart + 29 };
+        });
+        return adjusted;
+    }
+
+    function identifyNinoEvents(records) {
+        const seasons = records.flatMap((record, index) => {
+            const before = records[index - 1];
+            const after = records[index + 1];
+            if (!before || !after || before.monthId !== record.monthId - 1 || after.monthId !== record.monthId + 1
+                || ![before, record, after].every(item => Number.isFinite(item.value))) return [];
+            return [{ ...record, value: (before.value + record.value + after.value) / 3 }];
+        });
+        const events = [];
+        let run = [];
+        let phase = 0;
+        function finishRun() {
+            if (run.length >= 5) {
+                events.push({ phase: phase > 0 ? 'warm' : 'cold', seasons: run,
+                    peak: run.reduce((peak, record) => phase * record.value > phase * peak.value ? record : peak),
+                    ongoing: run.at(-1).monthId === records.at(-1).monthId - 1 });
+            }
+            run = [];
+        }
+        seasons.forEach(record => {
+            const nextPhase = record.value >= NINO34_SETTINGS.threshold ? 1 : record.value <= -NINO34_SETTINGS.threshold ? -1 : 0;
+            if (nextPhase !== phase || (run.length && record.monthId !== run.at(-1).monthId + 1)) finishRun();
+            phase = nextPhase;
+            if (phase) run.push(record);
+        });
+        finishRun();
+        return events;
+    }
+
+    function ninoComparisonWindows(records, events) {
+        const seasonYear = record => Math.floor(record.year) - (record.monthIndex < 3 ? 1 : 0);
+        const currentYear = seasonYear(records.at(-1));
+        const phases = new Map();
+        // Keep the peak season and each winter of a multi-year event, rather than adding a spring-tail window.
+        events.forEach(event => [event.peak, ...event.seasons.filter(record => record.monthIndex === 11)].forEach(record => {
+            const year = seasonYear(record);
+            if (!phases.has(year)) phases.set(year, new Set());
+            phases.get(year).add(event.phase);
+        }));
+        if (!phases.has(currentYear)) phases.set(currentYear, new Set());
+        return [...phases].sort(([a], [b]) => a - b).flatMap(([startYear, types]) => {
+            const firstMonth = startYear * 12 + 3;
+            if (firstMonth < records[0].monthId) return [];
+            return [{ startYear, isCurrent: startYear === currentYear,
+                phase: types.size === 1 ? [...types][0] : types.size > 1 ? 'mixed' : 'neutral',
+                label: `Apr ${startYear}–Mar ${startYear + 1}`,
+                records: records.filter(record => record.monthId >= firstMonth && record.monthId < firstMonth + 12)
+                    .map(record => ({ ...record, year: record.monthId - firstMonth })) }];
+        });
+    }
+
+    function renderNinoChart(host, model, view, selectedYear, onWindowFocus) {
+        const comparison = view === 'events';
+        const width = 1100;
+        const height = 656;
+        const margin = { top: 20, right: 40, bottom: 86, left: 88 };
+        const plotWidth = width - margin.left - margin.right;
+        const plotHeight = height - margin.top - margin.bottom;
+        const firstYear = Math.floor(model.records[0].year);
+        const lastYear = Math.floor(model.records.at(-1).year);
+        const xStart = comparison ? -0.25 : firstYear - 0.5;
+        const xEnd = comparison ? 11.25 : lastYear + 1;
+        const x = value => margin.left + (value - xStart) / (xEnd - xStart) * plotWidth;
+        const y = value => margin.top + (model.yMax - value) / (model.yMax - model.yMin) * plotHeight;
+        const colors = { ...NINO34_SETTINGS.barColors, mixed: '#82738f', neutral: '#82738f', current: '#222222' };
+        host.replaceChildren();
+        const svg = appendSvg(host, 'svg', { width, height, viewBox: `0 0 ${width} ${height}`, role: 'img',
+            'aria-label': comparison ? 'DCENT-I Niño 3.4 event comparison, April to the following March; current season in black with monthly dots'
+                : `DCENT-I monthly Niño 3.4 bars, ${firstYear}–${lastYear}; positive values in red, negative in blue, with event background bands` });
+        const defs = appendSvg(svg, 'defs');
+        const clip = appendSvg(defs, 'clipPath', { id: 'nino-chart-clip' });
+        appendSvg(clip, 'rect', { x: margin.left, y: margin.top, width: plotWidth, height: plotHeight });
+        if (!comparison) {
+            const bands = appendSvg(svg, 'g', { 'clip-path': 'url(#nino-chart-clip)' });
+            model.events.forEach(event => {
+                // Each qualifying three-month mean is plotted at its central month.
+                const start = x(event.seasons[0].year - 0.5 / 12);
+                const end = x(event.seasons.at(-1).year + 0.5 / 12);
+                const top = event.phase === 'warm' ? margin.top : y(0);
+                const bottom = event.phase === 'warm' ? y(0) : height - margin.bottom;
+                appendSvg(bands, 'rect', { class: 'dashboard-nino-event-band', x: start, y: top,
+                    width: end - start, height: bottom - top, fill: NINO34_SETTINGS.bandColors[event.phase],
+                    role: 'img', 'aria-label': `${event.phase === 'warm' ? 'El Niño' : 'La Niña'}: ${event.seasons[0].dateLabel}–${event.seasons.at(-1).dateLabel} (3-month means)` });
+            });
+        }
+        for (let value = model.yMin; value <= model.yMax; value += 0.5) {
+            appendSvg(svg, 'line', { class: value === 0 ? 'dashboard-zero-line'
+                : Number.isInteger(value) ? 'dashboard-grid-line-major' : 'dashboard-grid-line-minor',
+                x1: margin.left, x2: width - margin.right, y1: y(value), y2: y(value) });
+            if (Number.isInteger(value)) appendSvg(svg, 'text', { class: 'dashboard-tick',
+                x: margin.left - 12, y: y(value) + 7, 'text-anchor': 'end' }, String(value));
+        }
+        const lineLayer = appendSvg(svg, 'g', { 'clip-path': 'url(#nino-chart-clip)' });
+        const windows = comparison ? model.windows.map(window => ({ ...window,
+            color: window.isCurrent ? colors.current : colors[window.phase],
+            pointsByMonth: new Map(window.records.filter(record => Number.isFinite(record.value)).map(record => [record.year, record])),
+            line: appendSvg(lineLayer, 'path', { class: 'dashboard-nino-line',
+                d: linePath(window.records.filter(record => Number.isFinite(record.value)), x, y, 1.1) })
+        })) : [];
+        const currentWindow = windows.find(window => window.isCurrent);
+        if (!comparison) {
+            const bars = model.records.filter(record => Number.isFinite(record.value)).map(record => {
+                const start = x(record.year - 0.5 / 12);
+                return { x: start,
+                    y: y(Math.max(0, record.value)), width: x(record.year + 0.5 / 12) - start,
+                    height: Math.abs(y(record.value) - y(0)), fill: record.value >= 0 ? colors.warm : colors.cold };
+            });
+            // Paint the white backing first, so narrow monthly bars never cover one another with white strokes.
+            appendSvg(lineLayer, 'path', { class: 'dashboard-nino-bar-backing',
+                d: bars.map(bar => `M ${bar.x} ${bar.y} h ${bar.width} v ${bar.height} h ${-bar.width} Z`).join(' '),
+                fill: '#fff', stroke: '#fff', 'stroke-width': 4, 'stroke-linejoin': 'round',
+                'vector-effect': 'non-scaling-stroke', 'pointer-events': 'none' });
+            bars.forEach(bar => appendSvg(lineLayer, 'rect', { class: 'dashboard-nino-bar', ...bar }));
+        }
+        // Draw over the data, with a white edge so the thresholds remain visible across bars.
+        const thresholdLayer = appendSvg(svg, 'g', { class: 'dashboard-nino-thresholds', 'pointer-events': 'none' });
+        for (const threshold of [-NINO34_SETTINGS.threshold, NINO34_SETTINGS.threshold]) {
+            const color = threshold > 0 ? colors.warm : colors.cold;
+            const line = { x1: margin.left, x2: width - margin.right,
+                y1: y(threshold), y2: y(threshold), 'stroke-dasharray': '6 5', 'vector-effect': 'non-scaling-stroke' };
+            appendSvg(thresholdLayer, 'line', { ...line, stroke: '#fff', 'stroke-width': 3.4 });
+            appendSvg(thresholdLayer, 'line', { ...line, stroke: color, 'stroke-width': 1.4 });
+            appendSvg(thresholdLayer, 'text', { class: 'dashboard-nino-threshold-label', x: width - margin.right - 6,
+                y: y(threshold) - 8, 'text-anchor': 'end', fill: color }, `${threshold > 0 ? '+' : '−'}${NINO34_SETTINGS.threshold}°C`);
+        }
+        if (currentWindow) {
+            const points = appendSvg(svg, 'g', { 'clip-path': 'url(#nino-chart-clip)', 'pointer-events': 'none' });
+            currentWindow.pointsByMonth.forEach(record => appendSvg(points, 'circle', {
+                class: 'dashboard-nino-current-point', cx: x(record.year), cy: y(record.value), r: 7, fill: colors.current
+            }));
+        }
+        appendSvg(svg, 'line', { class: 'dashboard-axis', x1: margin.left, x2: width - margin.right,
+            y1: height - margin.bottom, y2: height - margin.bottom });
+        appendSvg(svg, 'line', { class: 'dashboard-axis', x1: margin.left, x2: margin.left,
+            y1: margin.top, y2: height - margin.bottom });
+        const ticks = comparison ? Array.from({ length: 12 }, (_, i) => i)
+            : Array.from({ length: Math.floor(lastYear / 25) - Math.ceil(firstYear / 25) + 1 }, (_, i) => (Math.ceil(firstYear / 25) + i) * 25);
+        ticks.forEach(value => {
+            appendSvg(svg, 'line', { class: 'dashboard-axis', x1: x(value), x2: x(value),
+                y1: height - margin.bottom, y2: height - margin.bottom + 6 });
+            appendSvg(svg, 'text', { class: 'dashboard-tick', x: x(value), y: height - margin.bottom + 32,
+                'text-anchor': 'middle' }, comparison ? MONTH_LABELS[(value + 3) % 12] : String(value));
+        });
+        appendSvg(svg, 'text', { class: 'dashboard-axis-label', x: margin.left + plotWidth / 2,
+            y: height - (comparison ? 20 : 30), 'text-anchor': 'middle' }, comparison ? 'Month (April–March)' : 'Year');
+        let coverage;
+        if (!comparison) {
+            // Availability of the non-infilled index, not the fraction of observed grid cells.
+            const runs = [];
+            model.records.forEach(record => {
+                const last = runs.at(-1);
+                if (last && last.available === record.dcentAvailable && last.end.monthId + 1 === record.monthId) last.end = record;
+                else runs.push({ start: record, end: record, available: record.dcentAvailable });
+            });
+            const coverageColors = { available: '#7a8797', missing: '#e4e8ee' };
+            coverage = appendSvg(svg, 'g', { class: 'dashboard-nino-coverage', role: 'img',
+                'aria-label': 'DCENT index availability: dark grey means available; light grey means missing. This does not measure spatial coverage.' });
+            const coverageStart = x(model.records[0].year - 0.5 / 12);
+            appendSvg(coverage, 'rect', { x: coverageStart, y: height - margin.bottom - 13,
+                width: x(model.records.at(-1).year + 0.5 / 12) - coverageStart, height: 5,
+                fill: 'none', stroke: '#fff', 'stroke-width': 4, 'pointer-events': 'none', 'aria-hidden': 'true' });
+            runs.forEach(run => {
+                const start = x(run.start.year - 0.5 / 12);
+                const rect = appendSvg(coverage, 'rect', { x: start, y: height - margin.bottom - 13,
+                    width: x(run.end.year + 0.5 / 12) - start, height: 5,
+                    fill: run.available ? coverageColors.available : coverageColors.missing });
+                appendSvg(rect, 'title', {}, `DCENT index ${run.available ? 'available' : 'missing'}: ${run.start.dateLabel}–${run.end.dateLabel}`);
+            });
+            const legendStart = margin.left + plotWidth / 2 - 160;
+            appendSvg(svg, 'text', { class: 'dashboard-nino-coverage-label', x: legendStart, y: height - 6 }, 'DCENT index:');
+            for (const [status, offset] of [['available', 110], ['missing', 220]]) {
+                appendSvg(svg, 'rect', { x: legendStart + offset, y: height - 17, width: 18, height: 9, fill: coverageColors[status] });
+                appendSvg(svg, 'text', { class: 'dashboard-nino-coverage-label', x: legendStart + offset + 24, y: height - 6 }, status);
+            }
+        }
+        appendSvg(svg, 'text', { class: 'dashboard-axis-label', x: 23, y: margin.top + plotHeight / 2,
+            transform: `rotate(-90 23 ${margin.top + plotHeight / 2})`, 'text-anchor': 'middle' }, 'Niño 3.4 anomaly (°C)');
+
+        const hitArea = appendSvg(svg, 'rect', { class: 'dashboard-hit-area', x: margin.left, y: margin.top,
+            width: plotWidth, height: plotHeight });
+        // Keep the strip's date-range tooltips accessible above the chart's hover area.
+        if (coverage) svg.appendChild(coverage);
+        const hoverPoint = appendSvg(svg, 'circle', { r: 4.2, visibility: 'hidden', 'pointer-events': 'none' });
+        const tooltip = appendSvg(svg, 'g', { class: 'dashboard-tooltip', visibility: 'hidden' });
+        appendSvg(tooltip, 'rect', { class: 'dashboard-tooltip-background', width: 220, height: 95, rx: 5 });
+        const tooltipDate = appendSvg(tooltip, 'text', { class: 'dashboard-tooltip-year', x: 11, y: 20 });
+        const tooltipValue = appendSvg(tooltip, 'text', { class: 'dashboard-tooltip-value', x: 11, y: 42 });
+        const tooltipBaseline = appendSvg(tooltip, 'text', { class: 'dashboard-tooltip-value', x: 11, y: 63 });
+        const tooltipCoverage = appendSvg(tooltip, 'text', { class: 'dashboard-tooltip-value', x: 11, y: 84 });
+        let pinnedWindow = windows.find(window => window.startYear === selectedYear) || windows.find(window => window.isCurrent);
+        function focusWindow(window) {
+            windows.forEach(item => {
+                const active = item === window;
+                item.line.setAttribute('stroke', item.color);
+                item.line.setAttribute('stroke-width', item.isCurrent ? 2.4 : active ? 2 : 1.1);
+                item.line.setAttribute('opacity', active || item.isCurrent ? 1 : 0.45);
+            });
+            lineLayer.appendChild(window.line);
+            lineLayer.appendChild(currentWindow.line);
+            onWindowFocus(window);
+        }
+        function hideTooltip() {
+            hoverPoint.setAttribute('visibility', 'hidden');
+            tooltip.setAttribute('visibility', 'hidden');
+        }
+        function showNearest(event, pin = false) {
+            const bounds = svg.getBoundingClientRect();
+            const px = (event.clientX - bounds.left) * width / bounds.width;
+            const py = (event.clientY - bounds.top) * height / bounds.height;
+            const time = xStart + (px - margin.left) / plotWidth * (xEnd - xStart);
+            const candidates = comparison
+                ? windows.flatMap(window => {
+                    const record = window.pointsByMonth.get(Math.max(0, Math.min(11, Math.round(time))));
+                    return record ? [{ record, window, color: window.color }] : [];
+                })
+                : model.records.filter(record => Number.isFinite(record.value)).map(record => ({ record,
+                    color: record.value >= 0 ? colors.warm : colors.cold }));
+            const distance = candidate => comparison ? Math.abs(y(candidate.record.value) - py) : Math.abs(x(candidate.record.year) - px);
+            const nearest = candidates.reduce((best, item) => !best || distance(item) < distance(best) ? item : best, undefined);
+            const tolerance = VERTICAL_HIT_TOLERANCE_PX * height / bounds.height;
+            const valueY = nearest && y(nearest.record.value);
+            if (!nearest || (comparison ? Math.abs(valueY - py) > tolerance
+                : py < Math.min(valueY, y(0)) - tolerance || py > Math.max(valueY, y(0)) + tolerance)) {
+                hideTooltip();
+                return;
+            }
+            if (comparison) {
+                focusWindow(nearest.window);
+                if (pin) {
+                    pinnedWindow = nearest.window;
+                    onWindowFocus(pinnedWindow, true);
+                }
+            }
+            const record = nearest.record;
+            hoverPoint.setAttribute('cx', x(record.year));
+            hoverPoint.setAttribute('cy', y(record.value));
+            hoverPoint.setAttribute('fill', nearest.color);
+            hoverPoint.setAttribute('visibility', 'visible');
+            tooltipDate.textContent = record.dateLabel;
+            tooltipValue.textContent = `${record.value >= 0 ? '+' : ''}${record.value.toFixed(2)} °C`;
+            tooltipValue.setAttribute('fill', nearest.color);
+            tooltipBaseline.textContent = `Baseline: ${record.baselineStart}–${record.baselineEnd}`;
+            tooltipCoverage.textContent = `DCENT index: ${record.dcentAvailable ? 'available' : 'missing'}`;
+            const tx = Math.max(margin.left, Math.min(width - margin.right - 220, x(record.year) + 12));
+            const ty = y(record.value) - 107 < margin.top ? y(record.value) + 12 : y(record.value) - 107;
+            tooltip.setAttribute('transform', `translate(${tx} ${ty})`);
+            tooltip.setAttribute('visibility', 'visible');
+        }
+        hitArea.addEventListener('pointermove', event => showNearest(event));
+        hitArea.addEventListener('click', event => showNearest(event, true));
+        hitArea.addEventListener('pointerleave', () => {
+            hideTooltip();
+            if (comparison) focusWindow(pinnedWindow);
+        });
+        if (comparison) focusWindow(pinnedWindow);
+        return {
+            selectWindow(year) {
+                pinnedWindow = windows.find(window => window.startYear === year) || windows.find(window => window.isCurrent);
+                hideTooltip();
+                focusWindow(pinnedWindow);
+            }
+        };
+    }
+
+    function initialiseNinoChart(host, initialState = {}, onStateChange) {
+        const chartHost = host.querySelector('.dashboard-nino-chart');
+        const subtitle = host.querySelector('[data-nino-subtitle]');
+        const note = host.querySelector('[data-nino-note]');
+        const selector = host.querySelector('[data-nino-window]');
+        const buttons = [...host.querySelectorAll('[data-nino-view]')];
+        const state = { view: initialState.view === 'events' ? 'events' : 'series', windowYear: initialState.windowYear ?? null };
+        let model;
+        let chart;
+        function refresh() {
+            buttons.forEach(button => {
+                const active = button.dataset.ninoView === state.view;
+                button.classList.toggle('is-active', active);
+                button.setAttribute('aria-pressed', String(active));
+            });
+            selector.style.visibility = state.view === 'events' ? 'visible' : 'hidden';
+            if (!model) return;
+            const latest = model.records.findLast(record => Number.isFinite(record.value));
+            subtitle.textContent = `${latest.dateLabel}: ${latest.value >= 0 ? '+' : ''}${latest.value.toFixed(2)} °C`;
+            chart = renderNinoChart(chartHost, model, state.view, state.windowYear, (window, pinned) => {
+                selector.value = String(window.startYear);
+                subtitle.textContent = `${window.isCurrent ? 'Current · ' : ''}${window.label}`;
+                if (pinned) {
+                    state.windowYear = window.isCurrent ? null : window.startYear;
+                    onStateChange({ ...state });
+                }
+            });
+        }
+        buttons.forEach(button => button.addEventListener('click', () => {
+            state.view = button.dataset.ninoView;
+            refresh();
+            onStateChange({ ...state });
+        }));
+        selector.addEventListener('change', () => {
+            const year = Number(selector.value);
+            state.windowYear = model.windows.find(window => window.startYear === year).isCurrent ? null : year;
+            chart.selectWindow(year);
+            onStateChange({ ...state });
+        });
+        refresh();
+        // Start while the first card is visible; switching views never refetches the data.
+        return fetchLiveText(NINO34_DATA_URL).then(parseNino34Series).then(adjustNino34Baseline).then(records => {
+            const events = identifyNinoEvents(records);
+            const values = records.map(record => record.value).filter(Number.isFinite);
+            model = { records, events, windows: ninoComparisonWindows(records, events),
+                yMin: Math.floor(Math.min(...values, -NINO34_SETTINGS.threshold) * 2) / 2 - 0.5,
+                yMax: Math.ceil(Math.max(...values, NINO34_SETTINGS.threshold) * 2) / 2 + 0.5 };
+            const phaseLabels = { warm: 'El Niño', cold: 'La Niña', mixed: 'El Niño / La Niña', neutral: 'Neutral' };
+            selector.innerHTML = model.windows.slice().reverse().map(window =>
+                `<option value="${window.startYear}">${window.isCurrent ? 'Current' : phaseLabels[window.phase]} · ${window.startYear}–${window.startYear + 1}</option>`).join('');
+            selector.disabled = false;
+            note.textContent = `30-year monthly baselines, updated every 5 years; end windows: ${records[0].baselineStart}–${records[0].baselineEnd} / ${records.at(-1).baselineStart}–${records.at(-1).baselineEnd}. Events: ≥5 consecutive overlapping 3-month means at ≥+${NINO34_SETTINGS.threshold}°C or ≤−${NINO34_SETTINGS.threshold}°C.`;
+            refresh();
+        }).catch(error => {
+            chartHost.innerHTML = '<p class="dashboard-status error">Niño 3.4 data could not be loaded. Please refresh to try again.</p>';
+            console.error('Unable to load Niño 3.4 data:', error);
+        });
     }
 
     function readDashboardSessionState() {
@@ -2865,6 +3247,7 @@
             new ResizeObserver(scheduleActiveUpdate).observe(viewport);
         }
         viewport.addEventListener('keydown', event => {
+            if (event.target.closest('select')) return;
             if (event.key === 'ArrowRight') {
                 event.preventDefault();
                 goTo(activeIndex + 1);
@@ -2996,6 +3379,27 @@
                             </div>
                         </section>
                     </article>
+                    <article class="dashboard-slide" aria-labelledby="nino-heading">
+                        <section class="dashboard-panel dashboard-panel--nino">
+                            <div class="dashboard-panel-heading">
+                                <h2 id="nino-heading">DCENT-I Niño 3.4 Index</h2>
+                                <p class="dashboard-panel-subtitle" data-nino-subtitle>&nbsp;</p>
+                            </div>
+                            <figure class="dashboard-figure">
+                                <div class="dashboard-chart-frame">
+                                    <div class="dashboard-chart dashboard-nino-chart"><p class="dashboard-status">Loading Niño 3.4 data…</p></div>
+                                </div>
+                                <div class="dashboard-nino-controls">
+                                    <select class="dashboard-nino-window" data-nino-window aria-label="Choose an event comparison window" disabled></select>
+                                    <div class="dashboard-spatial-control-group" role="group" aria-label="Choose the Niño 3.4 view">
+                                        <button class="dashboard-spatial-control is-active" type="button" data-nino-view="series" aria-pressed="true">Time series</button>
+                                        <button class="dashboard-spatial-control" type="button" data-nino-view="events" aria-pressed="false">Event comparison</button>
+                                    </div>
+                                </div>
+                                <figcaption class="dashboard-chart-note" data-nino-note></figcaption>
+                            </figure>
+                        </section>
+                    </article>
                     <article class="dashboard-slide" aria-labelledby="warming-stripes-heading">
                         <section class="dashboard-panel dashboard-panel--stripes">
                             <div class="dashboard-panel-heading">
@@ -3020,7 +3424,8 @@
                             <button class="dashboard-carousel-dot" type="button" data-carousel-slide="1" aria-label="Show monthly time series"></button>
                             <button class="dashboard-carousel-dot" type="button" data-carousel-slide="2" aria-label="Show regional time series"></button>
                             <button class="dashboard-carousel-dot" type="button" data-carousel-slide="3" aria-label="Show spatial maps"></button>
-                            <button class="dashboard-carousel-dot" type="button" data-carousel-slide="4" aria-label="Show DCENT-I warming stripes"></button>
+                            <button class="dashboard-carousel-dot" type="button" data-carousel-slide="4" aria-label="Show Niño 3.4 index"></button>
+                            <button class="dashboard-carousel-dot" type="button" data-carousel-slide="5" aria-label="Show DCENT-I warming stripes"></button>
                         </div>
                     </div>
                     <button class="dashboard-carousel-arrow" type="button" data-carousel-next aria-label="Next dashboard view">›</button>
@@ -3036,6 +3441,11 @@
             content.querySelector('.dashboard-panel--regional'),
             dashboardState.regionalChart,
             regionalState => saveDashboardState({ regionalChart: regionalState })
+        );
+        initialiseNinoChart(
+            content.querySelector('.dashboard-panel--nino'),
+            dashboardState.ninoChart,
+            ninoState => saveDashboardState({ ninoChart: ninoState })
         );
         const spatialMap = initialiseSpatialMap(
             content.querySelector('.dashboard-spatial-map'),
