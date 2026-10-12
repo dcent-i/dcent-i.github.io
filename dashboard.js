@@ -16,11 +16,20 @@
     };
     const BERKELEY_LIVE_DATA_URL = 'https://storage.googleapis.com/storage/v1/b/berkeley-earth-temperature-hr/o/global%2FGlobal_TAVG_annual.txt?alt=media';
     const NINO34_DATA_URL = 'https://dl.dropboxusercontent.com/scl/fi/i9tuswl0rs0g8ylzri2bs/DCENT_DCENT_I_Nino34_monthly_statistics_live.txt?rlkey=soatrfhnxmumjlfx2ymvny2d7&dl=0';
+    // 卡片显示顺序：调整名称的位置，保存后刷新。请保留全部六个名称。
+    // annual = 年度 GMST；monthly = 月度 GMST；regional = 区域；map = 地图；nino = Niño3.4；stripes = 暖化条纹。
+    const DASHBOARD_CARD_ORDER = ['nino', 'map', 'annual', 'monthly', 'regional', 'stripes'];
+    // 例如把 Niño 放第一张：['nino', 'annual', 'monthly', 'regional', 'map', 'stripes']。
     // Niño 卡片手动调整区；保存后刷新页面即可生效。
     const NINO34_SETTINGS = {
+        defaultView: 'events', // 'series' = Time series；'events' = Event comparison。
         threshold: 1.0, // 正数，单位 °C；事件识别、阈值线和注释共用此值，持续时间仍为 5 个重叠季节。
         barColors: { warm: '#b71f29', cold: '#1b6396' }, // 月度柱子及历史对比线的暖 / 冷色。
         bandColors: { warm: '#f2d5d8', cold: '#cfe3f3' } // 事件背景色带的实际颜色，建议用浅色。
+    };
+    // 地图默认时间尺度；修改后保存并刷新。
+    const SPATIAL_MAP_SETTINGS = {
+        defaultTimeMode: 'monthly' // 'monthly' = 月度；'annual' = 年度。
     };
     const REGIONAL_SERIES = {
         NHST: { label: 'Northern Hemisphere', scope: 'Northern Hemisphere', color: '#B75B4F', south: 0, north: 90 },
@@ -3261,6 +3270,32 @@
         updateActive();
     }
 
+    function applyDashboardSettings(content, state) {
+        const slides = [...content.querySelectorAll('.dashboard-slide')];
+        const dots = [...content.querySelectorAll('[data-carousel-slide]')];
+        const viewport = content.querySelector('.dashboard-carousel-viewport');
+        const dotHost = content.querySelector('.dashboard-carousel-dots');
+        const order = [...new Set([...DASHBOARD_CARD_ORDER, ...slides.map(slide => slide.dataset.dashboardCard)])]
+            .filter(key => slides.some(slide => slide.dataset.dashboardCard === key));
+        order.forEach((key, index) => {
+            const originalIndex = slides.findIndex(slide => slide.dataset.dashboardCard === key);
+            viewport.appendChild(slides[originalIndex]);
+            dots[originalIndex].dataset.carouselSlide = String(index);
+            dotHost.appendChild(dots[originalIndex]);
+        });
+        const orderKey = order.join(',');
+        if (state.cardOrder !== orderKey) state.activeSlide = 0;
+        state.cardOrder = orderKey;
+        if (state.ninoDefaultView !== NINO34_SETTINGS.defaultView) {
+            state.ninoChart = { view: NINO34_SETTINGS.defaultView, windowYear: null };
+        }
+        state.ninoDefaultView = NINO34_SETTINGS.defaultView;
+        if (state.mapDefaultTimeMode !== SPATIAL_MAP_SETTINGS.defaultTimeMode) {
+            state.spatialMap = { ...state.spatialMap, timeMode: SPATIAL_MAP_SETTINGS.defaultTimeMode };
+        }
+        state.mapDefaultTimeMode = SPATIAL_MAP_SETTINGS.defaultTimeMode;
+    }
+
     function renderDashboard() {
         const content = document.querySelector('#dashboard .dashboard-content');
         if (!content || content.dataset.initialized === 'true') return;
@@ -3277,7 +3312,7 @@
         content.innerHTML = `
             <section class="dashboard-carousel" aria-label="DCENT data dashboard">
                 <div class="dashboard-carousel-viewport" tabindex="0" aria-label="Dashboard views. Use the arrow keys or navigation buttons to change view.">
-                    <article class="dashboard-slide" aria-labelledby="annual-gmst-heading">
+                    <article class="dashboard-slide" data-dashboard-card="annual" aria-labelledby="annual-gmst-heading">
                         <section class="dashboard-panel">
                             <div class="dashboard-panel-heading">
                                 <div>
@@ -3293,7 +3328,7 @@
                             </figure>
                         </section>
                     </article>
-                    <article class="dashboard-slide" aria-labelledby="monthly-panel-heading">
+                    <article class="dashboard-slide" data-dashboard-card="monthly" aria-labelledby="monthly-panel-heading">
                         <section class="dashboard-panel">
                             <div class="dashboard-panel-heading">
                                 <div>
@@ -3312,7 +3347,7 @@
                             </figure>
                         </section>
                     </article>
-                    <article class="dashboard-slide" aria-label="Regional temperature time series">
+                    <article class="dashboard-slide" data-dashboard-card="regional" aria-label="Regional temperature time series">
                         <section class="dashboard-panel dashboard-panel--regional">
                             <div class="dashboard-regional-content">
                                 <div class="dashboard-regional-regions" role="group" aria-label="Choose a region">
@@ -3339,7 +3374,7 @@
                             </div>
                         </section>
                     </article>
-                    <article class="dashboard-slide" aria-label="Spatial temperature maps">
+                    <article class="dashboard-slide" data-dashboard-card="map" aria-label="Spatial temperature maps">
                         <section class="dashboard-panel dashboard-panel--map" aria-label="Spatial temperature maps">
                             <div class="dashboard-spatial-map">
                                 <div class="dashboard-spatial-top-controls" role="group" aria-label="Choose the map measure">
@@ -3373,7 +3408,7 @@
                             </div>
                         </section>
                     </article>
-                    <article class="dashboard-slide" aria-labelledby="nino-heading">
+                    <article class="dashboard-slide" data-dashboard-card="nino" aria-labelledby="nino-heading">
                         <section class="dashboard-panel dashboard-panel--nino">
                             <div class="dashboard-panel-heading">
                                 <h2 id="nino-heading">DCENT-I Niño 3.4 Index</h2>
@@ -3394,7 +3429,7 @@
                             </figure>
                         </section>
                     </article>
-                    <article class="dashboard-slide" aria-labelledby="warming-stripes-heading">
+                    <article class="dashboard-slide" data-dashboard-card="stripes" aria-labelledby="warming-stripes-heading">
                         <section class="dashboard-panel dashboard-panel--stripes">
                             <div class="dashboard-panel-heading">
                                 <div>
@@ -3426,6 +3461,8 @@
                 </nav>
             </section>`;
 
+        applyDashboardSettings(content, dashboardState);
+
         // Shareable entry: ?card=nino&view=events#dashboard takes precedence over this tab's saved view.
         const dashboardParams = new URLSearchParams(window.location.search);
         if (dashboardParams.get('card') === 'nino') {
@@ -3434,9 +3471,9 @@
             dashboardState.ninoChart = { view: dashboardParams.get('view') === 'events' ? 'events' : 'series', windowYear: null };
         }
 
-        const chartHost = content.querySelector('.dashboard-chart:not(.dashboard-monthly-chart)');
+        const chartHost = content.querySelector('[data-dashboard-card="annual"] .dashboard-chart');
         const monthlyChartHost = content.querySelector('.dashboard-monthly-chart');
-        const annualSubtitle = content.querySelector('.dashboard-panel-subtitle');
+        const annualSubtitle = content.querySelector('[data-dashboard-card="annual"] .dashboard-panel-subtitle');
         const monthlySubtitle = content.querySelector('[data-monthly-subtitle]');
         const stripeChartHost = content.querySelector('.dashboard-stripe-chart');
         initialiseRegionalChart(
@@ -3524,7 +3561,7 @@
         });
         initialiseCarousel(content.querySelector('.dashboard-carousel'), activeIndex => {
             saveDashboardState({ activeSlide: activeIndex });
-            if (activeIndex === 3) {
+            if (content.querySelectorAll('.dashboard-slide')[activeIndex].dataset.dashboardCard === 'map') {
                 spatialMap.ensureLoaded();
                 spatialMap.preloadLatestMonth();
             }
